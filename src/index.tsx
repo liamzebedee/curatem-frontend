@@ -1,4 +1,5 @@
 import { createWeb3ReactRoot, Web3ReactProvider } from '@web3-react/core'
+import { ApolloProviderWrapper } from 'contexts/apollo'
 import 'inter-ui'
 import React, { StrictMode } from 'react'
 import ReactDOM from 'react-dom'
@@ -9,6 +10,10 @@ import { NetworkContextName } from './constants'
 import App from './pages/App'
 import store from './state'
 import getLibrary from './utils/getLibrary'
+
+if (!process.env.REACT_APP_GNOSIS_GRAPHQL_ENDPOINT) {
+  throw new Error('REACT_APP_GNOSIS_GRAPHQL_ENDPOINT environment variable not defined')
+}
 
 const Web3ProviderNetwork = createWeb3ReactRoot(NetworkContextName)
 
@@ -49,11 +54,13 @@ ReactDOM.render(
   <StrictMode>
     <Web3ReactProvider getLibrary={getLibrary}>
       <Web3ProviderNetwork getLibrary={getLibrary}>
+        <ApolloProviderWrapper>
           <Provider store={store}>
             <HashRouter>
               <App />
             </HashRouter>
           </Provider>
+        </ApolloProviderWrapper>
       </Web3ProviderNetwork>
     </Web3ReactProvider>
   </StrictMode>,

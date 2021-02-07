@@ -25,3 +25,8 @@ declare module 'jazzicon' {
     declare function toB58String(hash: Uint8Array): string
   }
   
+  type Maybe<T> = T | null
+
+  declare module 'apollo-link-logger'
+  declare module '@realitio/realitio-lib/formatters/question'
+  declare module '@realitio/realitio-lib/formatters/template'

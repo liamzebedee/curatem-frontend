@@ -1,3 +1,5 @@
+import { ChakraProvider } from '@chakra-ui/react'
+import ViewMarket from 'pages/ViewMarket'
 import React, { StrictMode } from 'react'
 import { Redirect, Route, Switch } from 'react-router-dom'
 import styled from 'styled-components'
@@ -34,18 +36,23 @@ const BodyWrapper = styled.div`
 
 export default function App() {
     return (
-        <AppWrapper>
-            <HeaderWrapper>
-                <Header />
-            </HeaderWrapper>
-            <BodyWrapper>
-                <Web3ReactManager>
-                    <Switch>
-                        <Route exact strict path="/communities" component={ViewCommunities} />
-                        <Redirect to="/communities"/>
-                    </Switch>
-                </Web3ReactManager>
-            </BodyWrapper>
-        </AppWrapper>
+        <ChakraProvider>
+            <AppWrapper>
+                <HeaderWrapper>
+                    <Header />
+                </HeaderWrapper>
+                <BodyWrapper>
+                    <Web3ReactManager>
+                        <Switch>
+                            <Route exact strict path="/communities/:community/markets/:market" component={ViewMarket} />
+                            <Route exact strict path="/communities/:community/markets/" component={ViewCommunities} />
+                            <Route exact strict path="/communities/:community" component={ViewCommunities} />
+                            <Route exact strict path="/communities" component={ViewCommunities} />
+                            <Redirect to="/communities"/>
+                        </Switch>
+                    </Web3ReactManager>
+                </BodyWrapper>
+            </AppWrapper>
+        </ChakraProvider>
     )
 }
