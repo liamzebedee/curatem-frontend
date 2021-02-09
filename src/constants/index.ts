@@ -1,5 +1,4 @@
 export const NetworkContextName = 'NETWORK'
-export const networkId: number = parseInt(process.env.REACT_APP_ETH_NETWORK_ID || '')
 
 const {
     REACT_APP_GNOSIS_GRAPHQL_ENDPOINT_HTTP,

@@ -1,26 +1,31 @@
 import { Web3Provider } from '@ethersproject/providers'
-import { ChainId } from '@uniswap/sdk'
-import { useWeb3React as useWeb3ReactCore } from '@web3-react/core'
+import { useWeb3React } from '@web3-react/core'
 import { Web3ReactContextInterface } from '@web3-react/core/dist/types'
 import { useEffect, useState } from 'react'
 import { isMobile } from 'react-device-detect'
 import { injected } from '../connectors'
 import { NetworkContextName } from '../constants'
 
-export function useActiveWeb3React(): Web3ReactContextInterface<Web3Provider> & { chainId?: ChainId } {
-  const context = useWeb3ReactCore<Web3Provider>()
-  const contextNetwork = useWeb3ReactCore<Web3Provider>(NetworkContextName)
+export function useActiveWeb3React(): Web3ReactContextInterface<Web3Provider> {
+  const context = useWeb3React<Web3Provider>()
+  const contextNetwork = useWeb3React<Web3Provider>(NetworkContextName)
   return context.active ? context : contextNetwork
 }
 
 export function useEagerConnect() {
-  const { activate, active } = useWeb3ReactCore() // specifically using useWeb3ReactCore because of what this hook does
+  const { activate, active } = useWeb3React() // specifically using useWeb3React because of what this hook does
   const [tried, setTried] = useState(false)
 
   useEffect(() => {
     injected.isAuthorized().then(isAuthorized => {
       if (isAuthorized) {
-        activate(injected, undefined, true).catch(() => {
+        console.info(`Injected Web3 Provider is already authorised, activating...`)
+        activate(injected, undefined, true)
+        .then(() => {
+          console.info(`Injected Web3 Provider activated!`)
+        })
+        .catch((ex) => {
+          console.info(`Injected Web3 Provider activation failed! ${ex.toString()}`)
           setTried(true)
         })
       } else {
@@ -50,7 +55,7 @@ export function useEagerConnect() {
  * and out after checking what network theyre on
  */
 export function useInactiveListener(suppress = false) {
-  const { active, error, activate } = useWeb3ReactCore() // specifically using useWeb3React because of what this hook does
+  const { active, error, activate } = useWeb3React() // specifically using useWeb3React because of what this hook does
 
   useEffect(() => {
     const { ethereum } = window

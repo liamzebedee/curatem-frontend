@@ -6,6 +6,7 @@ import styled from 'styled-components'
 import Header from '../../components/Header'
 import Web3ReactManager from '../../components/Web3ReactManager'
 import ViewCommunities from '../ViewCommunities'
+import ViewMarkets from '../ViewMarkets'
 
 const AppWrapper = styled.div`
   display: flex;
@@ -37,22 +38,22 @@ const BodyWrapper = styled.div`
 export default function App() {
     return (
         <ChakraProvider>
-            <AppWrapper>
+            <Web3ReactManager>
+        <AppWrapper>
                 <HeaderWrapper>
                     <Header />
                 </HeaderWrapper>
                 <BodyWrapper>
-                    <Web3ReactManager>
                         <Switch>
                             <Route exact strict path="/communities/:community/markets/:market" component={ViewMarket} />
-                            <Route exact strict path="/communities/:community/markets/" component={ViewCommunities} />
+                            <Route exact strict path="/communities/:community/markets" component={ViewMarkets} />
                             <Route exact strict path="/communities/:community" component={ViewCommunities} />
                             <Route exact strict path="/communities" component={ViewCommunities} />
                             <Redirect to="/communities"/>
                         </Switch>
-                    </Web3ReactManager>
                 </BodyWrapper>
             </AppWrapper>
+            </Web3ReactManager>
         </ChakraProvider>
     )
 }
