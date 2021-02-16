@@ -23,18 +23,15 @@ function BreadcrumbNavigation(props: any) {
     
     const breadcrumbs = useBreadcrumbs();
 
-    return <>
-    <Breadcrumb separator={<></>}>
-        {breadcrumbs.map(({ breadcrumb, match }) => <>
-        
+    return <Breadcrumb separator={<></>}>
+        {breadcrumbs.map(({ breadcrumb, match }) => <span key={match.url}>
             <BreadcrumbItem>
                 <BreadcrumbLink href={`/#${match.url}`}>{breadcrumb}</BreadcrumbLink>
             </BreadcrumbItem>
             
             <ChevronRightIcon/>
-        </>)}
-        </Breadcrumb>
-    </>
+        </span>)}
+    </Breadcrumb>
 }
 
 export default () => {

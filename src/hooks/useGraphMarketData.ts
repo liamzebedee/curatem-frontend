@@ -198,6 +198,7 @@ const getBondedItems = (outcomes: string[], answers: AnswerItem[]): BondItem[] =
 
 const wrangleResponse = (data: GraphResponseFixedProductMarketMaker, networkId: number): GraphMarketMakerData => {
   const outcomes = data.outcomes ? data.outcomes : getOutcomes(networkId, +data.templateId)
+  debugger
 
   return {
     address: data.id,

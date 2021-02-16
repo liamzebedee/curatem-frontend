@@ -1,79 +1,69 @@
 import { useGraphMarketMakerData } from 'hooks/useGraphMarketData'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { RouteComponentProps } from '@reach/router'
 import { getCuratemApolloClient } from 'utils/getApolloClient'
 import gql from 'graphql-tag'
 import { useQuery } from '@apollo/client'
 import { Link } from 'react-router-dom'
+import { Heading } from '@chakra-ui/react'
 import { NETWORK_CHAIN_ID } from 'connectors'
-const ipfsClient = require('ipfs-http-client')
-
+import DynamicTable from '@atlaskit/dynamic-table';
+import { DateTime, Duration } from 'luxon'
 
 interface ViewMarketsProps extends RouteComponentProps {
     community?: string
 }
 
 const query = gql`
-        query GetCommunity($id: ID!) {
-            community(id: $id) {
+    query GetCommunity($id: ID!) {
+        community(id: $id) {
+            id,
+            moderator,
+            token,
+            spamMarkets {
                 id,
-                moderator,
-                token,
-                markets {
-                    id,
-                    metadataCID,
-                    conditionId,
-                    questionId,
-                    itemUrl
-                }
+                questionId,
+                itemUrl,
+                createdAt
             }
-        }`
+        }
+    }`
 
 const client = getCuratemApolloClient(NETWORK_CHAIN_ID)
 
-interface MarketMetadata {
-    url: string
-    type: string
+function toRelativeTs(unixTs: number) {
+    return DateTime.fromMillis(unixTs * 1000).toRelative()
 }
 
-async function loadJsonFileFromIpfs(cid: string): Promise<{}> {
-    // const ipfs = ipfsClient('/ip4/127.0.0.1/tcp/5001' as any)
-    const ipfs = ipfsClient('https://ipfs.infura.io:5001/')
+function buildRows(data: any) {
+    const markets = data.community.spamMarkets
 
-    for await (const file of ipfs.get(cid)) {
-        console.log(file.type, file.path)
-
-        if (!file.content) continue;
-
-        const content = []
-
-        for await (const chunk of file.content) {
-        content.push(chunk)
-        }
-        
-        const blob = JSON.parse(new TextDecoder("utf-8").decode(content[0]))
-        return blob
-    }
-
-    // TODO: define behaviour.
-    throw new Error("")
+    return markets
+        .map((market: any, i: number) => {
+            return {
+                key: `row-${i}-${market.id}`,
+                cells: [
+                    {
+                        content: <Link to={`/communities/${data.community.id}/markets/${market.id}`}>{market.itemUrl}</Link>,
+                    },
+                    {
+                        content: "",
+                    },
+                    {
+                        content: toRelativeTs(market.createdAt),
+                    },
+                    {
+                        content: "",
+                    }
+                ].map((cell, j) => {
+                    return {
+                        ...cell,
+                        key: `${i}-column-${j}`
+                    }
+                })
+            }
+        })
 }
-
-function useMarketMetadata(marketId: string): { metadata?: MarketMetadata } {
-    const [metadata, setMetadata] = useState<MarketMetadata>()
-    
-    async function load() {
-    }
-
-    useEffect(() => {
-        if(metadata == null) 
-            load()
-    }, [metadata])
-
-    return { metadata }
-}
-
-
 
 export default function ViewMarkets(props: any) {
     let { community } = props.match.params as ViewMarketsProps    
@@ -85,19 +75,64 @@ export default function ViewMarkets(props: any) {
         client,
     })
 
+    const rows = useMemo(
+        () => data ? buildRows(data) : [], 
+        [data]
+    )
+    
     if(loading) return null
+
+    if(error) return <>{error.toString()}</>
+
+    if(data.community === null) {
+        return <>No community found.</>
+    }
+
+    const head = {
+        cells: [
+            {
+                key: "post",
+                content: "Post",
+                isSortable: false,
+            },
+            {
+                key: "Author",
+                content: "Author",
+                isSortable: false,
+            },
+            {
+                key: "Created",
+                content: "Created",
+                isSortable: false,
+            },
+            {
+                key: "Volume",
+                content: "Volume",
+                isSortable: false,
+            }
+        ]
+    }
 
     return <>
         <div>
-            {data.community.markets.length} markets
+            <Heading as="h1" size="lg">Markets</Heading>
 
-            <ul>
-            {data.community.markets.map((market: any) => {
-                return <li>
-                    <Link to={`/communities/${community}/markets/${market.id}`}>{market.itemUrl}</Link>
-                </li>
-            })}
-            </ul>
+            {data.community.spamMarkets.length} markets
+
+            <DynamicTable
+                head={head}
+                rows={rows}
+                rowsPerPage={10}
+                defaultPage={1}
+                loadingSpinnerSize="large"
+                isLoading={false}
+                isFixedSize
+                // defaultSortKey="term"
+                defaultSortOrder="ASC"
+                onSort={() => console.log('onSort')}
+                onSetPage={() => console.log('onSetPage')}
+            />
+
         </div>
     </>
 }

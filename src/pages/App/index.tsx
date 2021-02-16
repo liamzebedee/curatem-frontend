@@ -7,6 +7,8 @@ import Header from '../../components/Header'
 import Web3ReactManager from '../../components/Web3ReactManager'
 import ViewCommunities from '../ViewCommunities'
 import ViewMarkets from '../ViewMarkets'
+import { QueryClientProvider, QueryClient } from 'react-query'
+const queryClient = new QueryClient()
 
 const AppWrapper = styled.div`
   display: flex;
@@ -37,9 +39,10 @@ const BodyWrapper = styled.div`
 
 export default function App() {
     return (
+      <QueryClientProvider client={queryClient}>
         <ChakraProvider>
             <Web3ReactManager>
-        <AppWrapper>
+              <AppWrapper>
                 <HeaderWrapper>
                     <Header />
                 </HeaderWrapper>
@@ -47,7 +50,7 @@ export default function App() {
                         <Switch>
                             <Route exact strict path="/communities/:community/markets/:market" component={ViewMarket} />
                             <Route exact strict path="/communities/:community/markets" component={ViewMarkets} />
-                            <Route exact strict path="/communities/:community" component={ViewCommunities} />
+                            {/* <Route exact strict path="/communities/:community" component={ViewCommunities} /> */}
                             <Route exact strict path="/communities" component={ViewCommunities} />
                             <Redirect to="/communities"/>
                         </Switch>
@@ -55,5 +58,6 @@ export default function App() {
             </AppWrapper>
             </Web3ReactManager>
         </ChakraProvider>
+        </QueryClientProvider>
     )
 }
