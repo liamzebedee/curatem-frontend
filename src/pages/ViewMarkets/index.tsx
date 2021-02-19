@@ -9,6 +9,12 @@ import { Heading } from '@chakra-ui/react'
 import { NETWORK_CHAIN_ID } from 'connectors'
 import DynamicTable from '@atlaskit/dynamic-table';
 import { DateTime, Duration } from 'luxon'
+import styled from 'styled-components'
+
+const ViewMarketsWrapper = styled.div`
+    display: block;
+    width: 1200px;
+`
 
 interface ViewMarketsProps extends RouteComponentProps {
     community?: string
@@ -113,10 +119,11 @@ export default function ViewMarkets(props: any) {
         ]
     }
 
-    return <>
+    return <ViewMarketsWrapper>
         <div>
             <Heading as="h1" size="lg">Markets</Heading>
 
+            
             {data.community.spamMarkets.length} markets
 
             <DynamicTable
@@ -134,5 +141,5 @@ export default function ViewMarkets(props: any) {
             />
 
         </div>
-    </>
+    </ViewMarketsWrapper>
 }

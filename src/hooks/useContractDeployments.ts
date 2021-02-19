@@ -5,13 +5,14 @@ import { Web3Provider } from '@ethersproject/providers'
 import { ContractDeployments } from 'utils/resolver'
 
 export const contracts = [
-    'RedditCommunity1'
+    'RedditCommunity1',
+    'WETH9',
+    'Scripts'
 ]
 
 export function useContractDeployments() {
     const { active, library, chainId } = useActiveWeb3React()
-    console.log(chainId)
-    const [ deployments, setDeployments ] = useState<ContractDeployments>()
+    const [ deployments, setDeployments ] = useState<ContractDeployments>({})
     
     async function load() {
         const deployments = await resolveContracts(`${chainId}`, contracts)
@@ -19,7 +20,9 @@ export function useContractDeployments() {
     }
 
     useEffect(() => {
-        if(library) load()
+        if(!library) return
+        if(deployments !== {}) return
+        load()
     }, [chainId, library])
     
     return { deployments }

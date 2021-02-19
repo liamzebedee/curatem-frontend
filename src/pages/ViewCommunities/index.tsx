@@ -7,7 +7,12 @@ import React, { useMemo } from 'react'
 import { Link, RouteComponentProps } from 'react-router-dom'
 import { getCuratemApolloClient } from 'utils/getApolloClient'
 import { useContractDeployments } from '../../hooks/useContractDeployments'
+import styled from 'styled-components'
 
+const ViewCommunitiesWrapper = styled.div`
+    display: block;
+    width: 1000px;
+`
 
 const head = {
     cells: [
@@ -94,7 +99,7 @@ export default function ViewCommunities(props: RouteComponentProps & any) {
         throw new Error("Unexpected error - subgraph could not load communities.")
     }
     
-    return <>
+    return <ViewCommunitiesWrapper>
         <Heading as="h1" size="lg">Communities</Heading>
 
         {data.communities.length} communities
@@ -111,5 +116,5 @@ export default function ViewCommunities(props: RouteComponentProps & any) {
             onSort={() => console.log('onSort')}
             onSetPage={() => console.log('onSetPage')}
         />
-    </>
+    </ViewCommunitiesWrapper>
 }

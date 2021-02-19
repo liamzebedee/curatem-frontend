@@ -8,7 +8,14 @@ import Web3ReactManager from '../../components/Web3ReactManager'
 import ViewCommunities from '../ViewCommunities'
 import ViewMarkets from '../ViewMarkets'
 import { QueryClientProvider, QueryClient } from 'react-query'
-const queryClient = new QueryClient()
+import Utils from 'pages/Utils'
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false
+    }
+  }
+})
 
 const AppWrapper = styled.div`
   display: flex;
@@ -52,6 +59,7 @@ export default function App() {
                             <Route exact strict path="/communities/:community/markets" component={ViewMarkets} />
                             {/* <Route exact strict path="/communities/:community" component={ViewCommunities} /> */}
                             <Route exact strict path="/communities" component={ViewCommunities} />
+                            <Route exact strict path="/utils" component={Utils} />
                             <Redirect to="/communities"/>
                         </Switch>
                 </BodyWrapper>
