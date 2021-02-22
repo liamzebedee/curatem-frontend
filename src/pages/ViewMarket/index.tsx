@@ -1,4 +1,4 @@
-import ViewMarketTraditional from './Traditional'
-import ViewMarketNu from './Nu'
+import ViewMarketTraditional from './Traditional';
+import ViewMarketNu from './Nu';
 
-export default ViewMarketTraditional
+export default ViewMarketTraditional;

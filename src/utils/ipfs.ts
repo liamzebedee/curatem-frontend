@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 
+/* eslint-disable @typescript-eslint/no-var-requires */
 const ipfsClient = require('ipfs-http-client')
 
-export async function loadJsonFileFromIpfs(cid: string): Promise<{}> {
+export async function loadJsonFileFromIpfs(cid: string): Promise<unknown> {
     // const ipfs = ipfsClient('/ip4/127.0.0.1/tcp/5001' as any)
     const ipfs = ipfsClient('https://ipfs.infura.io:5001/')
 
@@ -32,16 +33,16 @@ interface MarketMetadata {
     type: string
 }
 
-function useMarketMetadata(marketId: string): { metadata?: MarketMetadata } {
-    const [metadata, setMetadata] = useState<MarketMetadata>()
+// function useMarketMetadata(marketId: string): { metadata?: MarketMetadata } {
+//     const [metadata, setMetadata] = useState<MarketMetadata>()
     
-    async function load() {
-    }
+//     async function load() {
+//     }
 
-    useEffect(() => {
-        if(metadata == null) 
-            load()
-    }, [metadata])
+//     useEffect(() => {
+//         if(metadata == null) 
+//             load()
+//     }, [metadata])
 
-    return { metadata }
-}
+//     return { metadata }
+// }

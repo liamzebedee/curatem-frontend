@@ -22,6 +22,7 @@ export class DeploymentsJsonResolver implements ContractResolver {
     constructor(networkId: string, path?: string, deployments?: Deployments) {
         try {
             this.networkId = networkId
+            /* eslint-disable @typescript-eslint/no-var-requires */
             this.deployments = deployments || require(path!) as Deployments
         } catch (ex) {
             throw new Error(`Could not find deployments.json at ${path}: ${ex.toString()}`)
@@ -50,7 +51,7 @@ class GanacheArtifactResolver implements ContractResolver {
 
     resolve(contract: string) {
         let address: string
-        let artifactPath = `${this.path}/${contract}.json`
+        const artifactPath = `${this.path}/${contract}.json`
         try {
             const artifact = require(artifactPath)
             address = artifact.networks[this.networkId].address

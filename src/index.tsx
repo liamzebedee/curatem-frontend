@@ -1,24 +1,24 @@
-import { createWeb3ReactRoot, Web3ReactProvider } from '@web3-react/core'
-import { ApolloProviderWrapper } from 'contexts/apollo'
-import 'inter-ui'
-import React, { StrictMode } from 'react'
-import ReactDOM from 'react-dom'
-import ReactGA from 'react-ga'
-import { Provider } from 'react-redux'
-import { HashRouter } from 'react-router-dom'
-import { NetworkContextName } from './constants'
-import App from './pages/App'
-import store from './state'
-import getLibrary from './utils/getLibrary'
+import { createWeb3ReactRoot, Web3ReactProvider } from '@web3-react/core';
+import { ApolloProviderWrapper } from 'contexts/apollo';
+import 'inter-ui';
+import React, { StrictMode } from 'react';
+import ReactDOM from 'react-dom';
+import ReactGA from 'react-ga';
+import { Provider } from 'react-redux';
+import { HashRouter } from 'react-router-dom';
+import { NetworkContextName } from './constants';
+import App from './pages/App';
+import store from './state';
+import getLibrary from './utils/getLibrary';
 
 if (!process.env.REACT_APP_GNOSIS_GRAPHQL_ENDPOINT) {
-  throw new Error('REACT_APP_GNOSIS_GRAPHQL_ENDPOINT environment variable not defined')
+    throw new Error('REACT_APP_GNOSIS_GRAPHQL_ENDPOINT environment variable not defined');
 }
 
-const Web3ProviderNetwork = createWeb3ReactRoot(NetworkContextName)
+const Web3ProviderNetwork = createWeb3ReactRoot(NetworkContextName);
 
 if ('ethereum' in window) {
-  ;(window.ethereum as any).autoRefreshOnNetworkChange = false
+    (window.ethereum as any).autoRefreshOnNetworkChange = false;
 }
 
 // const GOOGLE_ANALYTICS_ID: string | undefined = process.env.REACT_APP_GOOGLE_ANALYTICS_ID
@@ -51,22 +51,21 @@ if ('ethereum' in window) {
 // }
 
 ReactDOM.render(
-  <StrictMode>
-    <Web3ReactProvider getLibrary={getLibrary}>
-      <Web3ProviderNetwork getLibrary={getLibrary}>
-        <ApolloProviderWrapper>
-          <Provider store={store}>
-            <HashRouter>
-              <App />
-            </HashRouter>
-          </Provider>
-        </ApolloProviderWrapper>
-      </Web3ProviderNetwork>
-    </Web3ReactProvider>
-  </StrictMode>,
-  document.getElementById('root')
-)
-
+    <StrictMode>
+        <Web3ReactProvider getLibrary={getLibrary}>
+            <Web3ProviderNetwork getLibrary={getLibrary}>
+                <ApolloProviderWrapper>
+                    <Provider store={store}>
+                        <HashRouter>
+                            <App />
+                        </HashRouter>
+                    </Provider>
+                </ApolloProviderWrapper>
+            </Web3ProviderNetwork>
+        </Web3ReactProvider>
+    </StrictMode>,
+    document.getElementById('root'),
+);
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))

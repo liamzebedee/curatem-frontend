@@ -198,7 +198,6 @@ const getBondedItems = (outcomes: string[], answers: AnswerItem[]): BondItem[] =
 
 const wrangleResponse = (data: GraphResponseFixedProductMarketMaker, networkId: number): GraphMarketMakerData => {
   const outcomes = data.outcomes ? data.outcomes : getOutcomes(networkId, +data.templateId)
-  debugger
 
   return {
     address: data.id,
@@ -242,7 +241,7 @@ const wrangleResponse = (data: GraphResponseFixedProductMarketMaker, networkId: 
   }
 }
 
-let needRefetch = false
+const needRefetch = false
 
 /**
  * Get data from the graph for the given market maker. All the information returned by this hook comes from the graph,

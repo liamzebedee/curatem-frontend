@@ -12,7 +12,7 @@ declare module 'jazzicon' {
       on?: (...args: any[]) => void
       removeListener?: (...args: any[]) => void
     }
-    web3?: {}
+    web3?: unknown
   }
   
   declare module 'content-hash' {
@@ -30,3 +30,4 @@ declare module 'jazzicon' {
   declare module 'apollo-link-logger'
   declare module '@realitio/realitio-lib/formatters/question'
   declare module '@realitio/realitio-lib/formatters/template'
+  declare module 'balancer-swapper';

@@ -1,11 +1,9 @@
 import { createReducer } from '@reduxjs/toolkit'
 import { loadMarket } from './actions'
 
-export interface Market {
-}
 
 export interface MarketsState {
-  [market: string]: Market
+  [market: string]: Record<string, unknown>
 }
 
 const initialState: MarketsState = {

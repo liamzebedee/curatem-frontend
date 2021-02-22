@@ -11,7 +11,7 @@ import { getGraphUris, getCuratemGraphUris } from '../constants'
 
 export const getApolloClient = (networkId: number) => {
     const { httpUri, wsUri } = getGraphUris(networkId)
-    let links = [apolloLogger]
+    const links = [apolloLogger]
     
     if(httpUri) {
         const httpLink = new HttpLink({
@@ -39,7 +39,7 @@ export const getApolloClient = (networkId: number) => {
 
 export function getCuratemApolloClient(networkId: number) {
   const { httpUri, wsUri } = getCuratemGraphUris(networkId)
-  let links = [apolloLogger]
+  const links = [apolloLogger]
   
   if(httpUri) {
       const httpLink = new HttpLink({
