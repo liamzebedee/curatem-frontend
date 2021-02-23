@@ -40,3 +40,5 @@ export function getCuratemGraphUris(networkId: number): GraphQLConfig {
         wsUri: REACT_APP_CURATEM_GRAPHQL_ENDPOINT_WS
     }
 }
+
+export const NULL_ADDRESS = '0x0000000000000000000000000000000000000000'

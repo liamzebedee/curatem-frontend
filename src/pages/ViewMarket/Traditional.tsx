@@ -18,6 +18,7 @@ import { fromWei, toWei } from 'utils';
 import { Currency, CurrencyAmount } from '@uniswap/sdk';
 import FormattedCurrencyAmount from 'components/FormattedCurrencyAmount';
 import { BalancerSwapper } from 'components/BalancerSwapper';
+import { NULL_ADDRESS } from '../../constants'
 // import { BalancerSwapper } from 'balancer-swapper'
 
 interface ViewMarketProps extends RouteComponentProps {
@@ -311,9 +312,9 @@ export default function ViewMarket(props: any) {
 
                     <SpamSelector {...data.spamPredictionMarket} market={data.spamPredictionMarket.id} />
 
-                    <span>
+                    <div>
                         {fromWei(data.user.spamToken_balance)} SPAM : {fromWei(data.user.notSpamToken_balance)} NOT-SPAM
-                    </span>
+                    </div>
                 </YourBet>
             </Row>
 
@@ -340,10 +341,10 @@ export default function ViewMarket(props: any) {
                     <Heading as="h3" size="md">
                         Trade
                     </Heading>
-                    {data.market.pool ? (
-                        <BalancerSwapper tokens={tokens} pool={data.market.pool} />
-                    ) : (
+                    {data.market.pool == NULL_ADDRESS ? (
                         <>No Balancer pool</>
+                    ) : (
+                        <BalancerSwapper tokens={tokens} pool={data.market.pool} />
                     )}
                 </TokenSwapper>
             </Row>
