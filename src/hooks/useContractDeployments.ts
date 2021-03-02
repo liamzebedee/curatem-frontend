@@ -7,23 +7,31 @@ import { ContractDeployments } from 'utils/resolver'
 export const contracts = [
     'RedditCommunity1',
     'WETH9',
-    'Scripts'
+    'Scripts',
+    'UniswapV2Router02'
 ]
 
 export function useContractDeployments() {
     const { active, library, chainId } = useActiveWeb3React()
-    const [ deployments, setDeployments ] = useState<ContractDeployments>({})
+    const [ state, setState ] = useState<Record<string, any>>({
+        deployments: {},
+        loaded: false
+    })
     
     async function load() {
         const deployments = await resolveContracts(`${chainId}`, contracts)
-        setDeployments(deployments)
+        console.log(`Loaded deployments`, deployments)
+        setState({
+            deployments,
+            loaded: true
+        })
     }
 
     useEffect(() => {
         if(!library) return
-        if(deployments !== {}) return
+        if(state.loaded) return
         load()
-    }, [chainId, library])
+    }, [chainId, library, state])
     
-    return { deployments }
+    return state
 }

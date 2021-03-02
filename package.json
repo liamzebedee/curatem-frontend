@@ -8,7 +8,6 @@
     "@atlaskit/dynamic-table": "^14.2.0",
     "@chakra-ui/icons": "^1.0.4",
     "@chakra-ui/react": "^1.2.1",
-    "@curatem/contracts": "file:../curatem-contracts",
     "@emotion/eslint-plugin": "^11.2.0",
     "@emotion/react": "^11.1.5",
     "@emotion/styled": "^11.1.5",

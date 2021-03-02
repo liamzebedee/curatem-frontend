@@ -15,6 +15,21 @@ export interface ContractResolver {
     resolve(contract: string): ContractDeployment
 }
 
+
+export async function resolveContracts(networkId: string, contracts: string[]): Promise<ContractDeployments> {
+  const deployments = require('@curatem/contracts/deployments.json')
+  console.log(`Resolving contracts from deployments`, deployments, `on network ${networkId}`)
+
+  const resolver: ContractResolver = new DeploymentsJsonResolver(networkId, undefined, require('@curatem/contracts/deployments.json'))
+//   const resolver2: GanacheArtifactResolver = new GanacheArtifactResolver(networkId, 'omen-subgraph/build/contracts')
+  
+  return contracts
+    .reduce((deployments: ContractDeployments, contract: string) => {
+      deployments[contract] = resolver.resolve(contract)
+      return deployments
+    }, {})
+  }
+
 export class DeploymentsJsonResolver implements ContractResolver {
     deployments: Deployments
     networkId: string
@@ -42,22 +57,21 @@ export class DeploymentsJsonResolver implements ContractResolver {
 
 class GanacheArtifactResolver implements ContractResolver {
     path: string
-    networkId: number
+    networkId: string
 
-    constructor(networkId: number, path: string) {
+    constructor(networkId: string, path: string) {
         this.networkId = networkId
         this.path = path
     }
 
     resolve(contract: string) {
         let address: string
-        const artifactPath = `${this.path}/${contract}.json`
         try {
-            const artifact = require(artifactPath)
+            const artifact = require(`${this.path}/${contract}.json`)
             address = artifact.networks[this.networkId].address
             // TODO: lookup transactionHash.
         } catch (ex) {
-            throw new Error(`Could not resolve contract ${contract} from Ganache artifact at ${artifactPath}`)
+            throw new Error(`Could not resolve contract ${contract} from Ganache artifact at ${`${this.path}/${contract}.json`}: ${ex.toString()}`)
         }
         return {
             address,

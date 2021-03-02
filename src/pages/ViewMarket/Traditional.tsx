@@ -5,7 +5,7 @@ import { getApolloClient, getCuratemApolloClient } from 'utils/getApolloClient';
 import gql from 'graphql-tag';
 import { useLazyQuery, useQuery } from '@apollo/client';
 import { NETWORK_CHAIN_ID } from 'connectors';
-import { Heading, Select } from '@chakra-ui/react';
+import { Button, Heading, Select } from '@chakra-ui/react';
 import { useRedditPostAPI, useRedditState } from 'state/reddit/hooks';
 import ReactMarkdown from 'react-markdown';
 import styled from 'styled-components';
@@ -113,6 +113,15 @@ const Row = styled.div`
     margin-bottom: 1rem;
 `;
 
+const Column = styled.div`
+    display: flex;
+    flex-direction: column;
+    > * {
+        margin-bottom: 1rem;
+    }
+    margin-right: 1rem;
+`;
+
 const PostContent = styled.div`
     display: block;
 
@@ -137,7 +146,7 @@ const PostContentPreview = styled.div`
 
 const YourBet = styled.div`
     display: block;
-    flex: 1 0;
+    flex: 0 0;
     align-self: start;
 
     border: 1px solid #ddd;
@@ -255,7 +264,7 @@ export default function ViewMarket(props: any) {
     const { data, isLoading: loading, error } = useReactQuery<any, Error>(
         ['load-market', market],
         () => loadMarket(account, library, market),
-        { retry: 0 },
+        { retry: 1 },
     );
 
     const { fetchPost } = useRedditPostAPI();
@@ -281,13 +290,16 @@ export default function ViewMarket(props: any) {
         data.spamPredictionMarket.notSpamToken,
         data.spamPredictionMarket.community.token,
     ];
+
     return (
         <>
             <Row>
+                <Column>
                 <PostContent>
                     <Heading as="h3" size="md">
                         Post content
                     </Heading>
+
                     <PostContentPreview>
                         <ReactMarkdown>{redditPost && redditPost.selftext}</ReactMarkdown>
                     </PostContentPreview>
@@ -305,20 +317,6 @@ export default function ViewMarket(props: any) {
                     </a>
                 </PostContent>
 
-                <YourBet>
-                    <Heading as="h3" size="md">
-                        Your bet
-                    </Heading>
-
-                    <SpamSelector {...data.spamPredictionMarket} market={data.spamPredictionMarket.id} />
-
-                    <div>
-                        {fromWei(data.user.spamToken_balance)} SPAM : {fromWei(data.user.notSpamToken_balance)} NOT-SPAM
-                    </div>
-                </YourBet>
-            </Row>
-
-            <Row>
                 <MarketOverview>
                     <Heading as="h3" size="md">
                         Prediction market
@@ -326,40 +324,87 @@ export default function ViewMarket(props: any) {
 
                     <MarketStateIcon state={data.market.state} />
 
-                    {/* { data.market.state !== 'resolved' 
-                  ? <p>Closes in {question.openingTimestamp}</p> 
-                  : null }
-                  
-                Closes in:  */}
+                        {/* { data.market.state !== 'resolved' 
+                    ? <p>Closes in {question.openingTimestamp}</p> 
+                    : null }
+                    
+                    Closes in:  */}
 
                     <p>Question ID: {data.spamPredictionMarket.questionId}</p>
                     <p>Balancer Pool: {data.market.pool}</p>
                     <p>Tokens: {tokens}</p>
                 </MarketOverview>
 
-                <TokenSwapper>
-                    <Heading as="h3" size="md">
-                        Trade
-                    </Heading>
-                    {data.market.pool == NULL_ADDRESS ? (
-                        <>No Balancer pool</>
-                    ) : (
-                        <BalancerSwapper tokens={tokens} pool={data.market.pool} />
-                    )}
-                </TokenSwapper>
+                </Column>
+
+
+                <Column>
+                    <YourBet>
+                        <Heading as="h3" size="md">
+                            Your bet
+                        </Heading>
+
+                        <SpamSelector {...data.spamPredictionMarket} market={data.spamPredictionMarket.id} />
+
+                        <div>
+                            <p>{fromWei(data.user.spamToken_balance)} SPAM</p>
+                            <p>{fromWei(data.user.notSpamToken_balance)} NOT-SPAM</p>
+                        </div>
+                    </YourBet>
+
+                    <TokenSwapper>
+                        <Heading as="h3" size="md">
+                            Trade
+                        </Heading>
+                        
+                    </TokenSwapper>
+                </Column>
+            </Row>
+
+            <Row>
+
+                
             </Row>
         </>
     );
+}
+
+async function checkBalanceAndAllow(token: ethers.Contract, amount: BigNumber, holder: string, spender: string) {
+    let balance = ethers.constants.Zero
+    let allowance = ethers.constants.Zero
+    let error
+
+    balance = await token.balanceOf(holder);
+    if (balance.lt(amount)) {
+        error = new Error(`Token balance is too low. Balance: ${balance.toString()}, minimum buy: 1,000,000`)
+        return [balance, allowance, error]
+    }
+
+    allowance = await token.allowance(
+        holder,
+        spender
+    )
+    if (allowance.lt(amount)) {
+        await token.approve(spender, ethers.constants.MaxUint256, { from: holder });
+    }
+
+    return [balance, allowance, null]
 }
 
 const SpamSelector = (props: any) => {
     const { account, library } = useWeb3React();
     const { deployments } = useContractDeployments();
 
+
     async function onSelect(ev: any) {
         const { value } = ev.target;
-
+        purchase(value)
+    }
+    
+    async function purchase(outcome: 'spam' | 'notspam') {
+        const outcomes = ['notspam', 'spam']
         const signer = getSigner(library, account!);
+        const buyAmount = toWei('1')
 
         const market = new ethers.Contract(
             props.market,
@@ -378,42 +423,29 @@ const SpamSelector = (props: any) => {
             signer,
         );
 
-        const balance = await collateralToken.balanceOf(account);
-        if (balance.lt(BigNumber.from('1000000'))) {
-            setError(`Token balance is too low. Balance: ${balance.toString()}, minimum buy: 1,000,000`);
-            return;
+
+        const scripts = new ethers.Contract(
+            deployments['Scripts'].address,
+            require("@curatem/contracts/abis/Scripts.json"),
+            getSigner(library, account!)
+        )
+
+        const [balance, allowance, error] = await checkBalanceAndAllow(collateralToken, buyAmount, account!, scripts.address)
+        if(error) {
+            setError(error.toString());
+            return
         }
 
-        const allowance = await collateralToken.allowance(account, market.address);
-
-        if (BigNumber.from(allowance).lt(BigNumber.from('1000000'))) {
-            await collateralToken.approve(market.address, ethers.constants.MaxUint256);
-        }
-
-        // Check pool exists.
-
-        // const scripts = new ethers.Contract(
-        //     deployments['Scripts'].address,
-        //     require("@curatem/contracts/abis/Scripts.json"),
-        //     getSigner(library, account!)
-        // )
-        // const allowance = await collateralToken.allowance(
-        //     scripts.address,
-        //     account
-        // )
-        // const pool = await market.pool()
-        // if(pool == '0x0000000000000000000000000000000000000000') {
-        //     await scripts.buyAndCreatePool(market.address, toWei('1'), toWei('1'))
-        // } else {
-        // }
-
-        // Check collateral balance is enough to buy.
-        await market.buy(BigNumber.from(10).pow(18));
-
-        // sell the opposite token into the pool
-        const tokenToSell = value == 'spam' ? spamToken : notSpamToken;
-        const poolAddress = await market.pool();
-        const pool = new ethers.Contract(poolAddress, require('@curatem/contracts/abis/IBPool.json'), signer);
+        await scripts.buyOutcomeElseProvideLiquidity(
+            market.address,
+            outcomes.indexOf(outcome),
+            buyAmount,
+            '9',
+            '10',
+            deployments['UniswapV2Router02'].address,
+            '10000',
+            '10000'
+        )
     }
 
     const [error, setError] = useState('');
@@ -422,9 +454,12 @@ const SpamSelector = (props: any) => {
         <>
             <Select placeholder="None" onChange={onSelect}>
                 <option value="spam">Spam</option>
-                <option value="not-spam">Not Spam</option>
+                <option value="notspam">Not Spam</option>
             </Select>
+            
+            <br/>
             {error}
         </>
     );
 };
+
