@@ -64,6 +64,10 @@ const YourBet = styled.div`
     border: 1px solid #ddd;
     padding: 1em;
     width: 400px;
+
+    > * {
+        margin-bottom: 0.5rem;
+    }
 `;
 
 const MarketOverview = styled.div`
@@ -173,12 +177,12 @@ export default function ViewMarket(props: any) {
                         <Heading as="h3" size="md">
                             Your bet
                         </Heading>
-
-                        <SpamSelector {...data.spamPredictionMarket} market={data.spamPredictionMarket.id} />
-
+                        
                         <div>
-                            <p>{fromWei(data.user.spamToken_balance)} SPAM</p>
-                            <p>{fromWei(data.user.notSpamToken_balance)} NOT-SPAM</p>
+                            <SpamSelector 
+                                balances={[data.user.notSpamToken_balance, data.user.spamToken_balance]}
+                                {...data.spamPredictionMarket} 
+                                market={data.spamPredictionMarket.id} />
                         </div>
                     </YourBet>
 
@@ -186,6 +190,9 @@ export default function ViewMarket(props: any) {
                         <Heading as="h3" size="md">
                             Trade
                         </Heading>
+
+                        <p>{fromWei(data.user.spamToken_balance)} SPAM</p>
+                        <p>{fromWei(data.user.notSpamToken_balance)} NOT-SPAM</p>
                     </TokenSwapper>
                 </Column>
             </Row>
@@ -223,12 +230,22 @@ const SpamSelector = (props: any) => {
     const { account, library } = useWeb3React();
     const { deployments } = useContractDeployments();
 
+    const [state, setState] = useState({
+        loading: false,
+        error: ''
+    })
+
     async function onSelect(ev: any) {
         const { value } = ev.target;
         purchase(value);
     }
 
     async function purchase(outcome: 'spam' | 'notspam') {
+        setState({
+            loading: true,
+            error: ''
+        })
+
         const outcomes = ['notspam', 'spam'];
         const signer = getSigner(library, account!);
         const buyAmount = toWei('1');
@@ -267,7 +284,10 @@ const SpamSelector = (props: any) => {
             scripts.address,
         );
         if (error) {
-            setError(error.toString());
+            setState({
+                loading: false,
+                error: error.toString()
+            })
             return;
         }
 
@@ -280,20 +300,43 @@ const SpamSelector = (props: any) => {
             deployments['UniswapV2Router02'].address,
             '10000',
             '10000',
-        );
+        )
+
+        setState({
+            loading: false,
+            error: ''
+        })
     }
 
-    const [error, setError] = useState('');
+    const outcomes = ['Not Spam', 'Spam']
+    const balances = props.balances
+
+    let defaultSelection = undefined
+    let largestIdx = 0
+    for(let i = 0; i < balances.length; i++) {
+        if(balances[i].gt(balances[largestIdx])) 
+            largestIdx = i
+    }
+
+    if(!balances[largestIdx].eq(ethers.constants.Zero)) {
+        defaultSelection = largestIdx
+    }
+    
 
     return (
-        <>
-            <Select placeholder="None" onChange={onSelect}>
-                <option value="spam">Spam</option>
-                <option value="notspam">Not Spam</option>
+        <div>
+            <Select 
+                placeholder="None" 
+                disabled={state.loading} 
+                onChange={onSelect}
+                defaultValue={defaultSelection}>
+                    {outcomes.map((outcome, idx) => {
+                        return <option key={idx} value={idx}>{outcome}</option>
+                    })}
             </Select>
 
             <br />
-            {error}
-        </>
+            {state.error}
+        </div>
     );
 };
