@@ -105,10 +105,11 @@ export const reducer = slice.reducer;
 
 export type AppThunk = ThunkAction<void, typeof initialState, null, Action<string>>;
 
-const initialise = (pool: ethers.Contract, erc20Template: ethers.Contract, tokens: string[]): AppThunk => async (
-    dispatch,
-    getState,
-) => {
+const initialise = (
+    pool: ethers.Contract,
+    erc20Template: ethers.Contract,
+    tokens: string[],
+): AppThunk => async (dispatch, getState) => {
     const state = selectBalancerSwapperState(getState());
 
     async function loadToken(tokenAddress: string) {
@@ -139,10 +140,11 @@ function selectBalancerSwapperState(state: any): any {
     return state;
 }
 
-const calculate = (pool: ethers.Contract, tokenTemplate: ethers.Contract, amountIn: string): AppThunk => async (
-    dispatch,
-    getState,
-) => {
+const calculate = (
+    pool: ethers.Contract,
+    tokenTemplate: ethers.Contract,
+    amountIn: string,
+): AppThunk => async (dispatch, getState) => {
     dispatch(startLoading());
 
     const state = selectBalancerSwapperState(getState());
@@ -267,8 +269,16 @@ const useContracts = (pool: string): any => {
     const [contracts, setContracts] = useState({});
 
     useEffect(() => {
-        const contract = new ethers.Contract(pool, require('@curatem/contracts/abis/IBPool.json'), getSigner(library));
-        const erc20 = new ethers.Contract('0x0000000000000000000000000000000000000000', ERC20, getSigner(library));
+        const contract = new ethers.Contract(
+            pool,
+            require('@curatem/contracts/abis/IBPool.json'),
+            getSigner(library),
+        );
+        const erc20 = new ethers.Contract(
+            '0x0000000000000000000000000000000000000000',
+            ERC20,
+            getSigner(library),
+        );
 
         setContracts({
             contract,
@@ -361,7 +371,8 @@ export function BalancerSwapper(props: any) {
             </Row>
 
             <Row>
-                <strong>To</strong> {state.tokenInfo[state.toToken]?.name || ''} ({shortenAddress(state.toToken)})
+                <strong>To</strong> {state.tokenInfo[state.toToken]?.name || ''} (
+                {shortenAddress(state.toToken)})
                 <NumberInput value={fromWei(state.amountOut)}>
                     <NumberInputField />
                 </NumberInput>

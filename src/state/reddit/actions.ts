@@ -1,3 +1,3 @@
-import { createAction } from '@reduxjs/toolkit'
+import { createAction } from '@reduxjs/toolkit';
 
-export const loadItem = createAction<{ itemUrl: string, response: any }>('reddit/fetchItem')
+export const loadItem = createAction<{ itemUrl: string; response: any }>('reddit/fetchItem');

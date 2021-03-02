@@ -30,7 +30,10 @@ export default function Utils(props: any) {
             {/* <Button onClick={buyWeth}>Buy WETH</Button> */}
 
             <BalancerSwapper
-                tokens={['0xd567aef25f09eb31d3a42a7e7fc682203885c994', '0x3ea11a499e9dda30ce7972630a178293666e4036']}
+                tokens={[
+                    '0xd567aef25f09eb31d3a42a7e7fc682203885c994',
+                    '0x3ea11a499e9dda30ce7972630a178293666e4036',
+                ]}
                 pool="0x04b81008d5eb862c733e79b8C26933B2eB2257FC"
             />
         </div>

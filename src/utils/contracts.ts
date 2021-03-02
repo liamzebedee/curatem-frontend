@@ -1,1 +1,1 @@
-export { resolveContracts } from './resolver'
+export { resolveContracts } from './resolver';

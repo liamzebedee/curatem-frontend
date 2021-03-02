@@ -18,7 +18,7 @@ import { fromWei, toWei } from 'utils';
 import { Currency, CurrencyAmount } from '@uniswap/sdk';
 import FormattedCurrencyAmount from 'components/FormattedCurrencyAmount';
 import { BalancerSwapper } from 'components/BalancerSwapper';
-import { NULL_ADDRESS } from '../../constants'
+import { NULL_ADDRESS } from '../../constants';
 // import { BalancerSwapper } from 'balancer-swapper'
 
 interface ViewMarketProps extends RouteComponentProps {
@@ -195,9 +195,21 @@ async function loadMarket(account: any, library: any, marketId: string) {
 
     const data = marketQueryResult.data.spamPredictionMarket;
 
-    const spamToken = new ethers.Contract(data.spamToken, require('@curatem/contracts/abis/ERC20.json'), library);
-    const notSpamToken = new ethers.Contract(data.notSpamToken, require('@curatem/contracts/abis/ERC20.json'), library);
-    const market = new ethers.Contract(data.id, require('@curatem/contracts/abis/SpamPredictionMarket.json'), library);
+    const spamToken = new ethers.Contract(
+        data.spamToken,
+        require('@curatem/contracts/abis/ERC20.json'),
+        library,
+    );
+    const notSpamToken = new ethers.Contract(
+        data.notSpamToken,
+        require('@curatem/contracts/abis/ERC20.json'),
+        library,
+    );
+    const market = new ethers.Contract(
+        data.id,
+        require('@curatem/contracts/abis/SpamPredictionMarket.json'),
+        library,
+    );
 
     const pool = await market.pool();
     console.debug(`Pool exists? ${pool}`);
@@ -295,34 +307,34 @@ export default function ViewMarket(props: any) {
         <>
             <Row>
                 <Column>
-                <PostContent>
-                    <Heading as="h3" size="md">
-                        Post content
-                    </Heading>
+                    <PostContent>
+                        <Heading as="h3" size="md">
+                            Post content
+                        </Heading>
 
-                    <PostContentPreview>
-                        <ReactMarkdown>{redditPost && redditPost.selftext}</ReactMarkdown>
-                    </PostContentPreview>
+                        <PostContentPreview>
+                            <ReactMarkdown>{redditPost && redditPost.selftext}</ReactMarkdown>
+                        </PostContentPreview>
 
-                    <Heading as="h3" size="md">
-                        Author
-                    </Heading>
-                    <span>@{redditPost && redditPost.author}</span>
+                        <Heading as="h3" size="md">
+                            Author
+                        </Heading>
+                        <span>@{redditPost && redditPost.author}</span>
 
-                    <Heading as="h3" size="md">
-                        Posted
-                    </Heading>
-                    <a href={data.spamPredictionMarket.itemUrl} target="_blank" rel="noreferrer">
-                        {redditPost && new Date(redditPost.created * 1000).toString()}
-                    </a>
-                </PostContent>
+                        <Heading as="h3" size="md">
+                            Posted
+                        </Heading>
+                        <a href={data.spamPredictionMarket.itemUrl} target="_blank" rel="noreferrer">
+                            {redditPost && new Date(redditPost.created * 1000).toString()}
+                        </a>
+                    </PostContent>
 
-                <MarketOverview>
-                    <Heading as="h3" size="md">
-                        Prediction market
-                    </Heading>
+                    <MarketOverview>
+                        <Heading as="h3" size="md">
+                            Prediction market
+                        </Heading>
 
-                    <MarketStateIcon state={data.market.state} />
+                        <MarketStateIcon state={data.market.state} />
 
                         {/* { data.market.state !== 'resolved' 
                     ? <p>Closes in {question.openingTimestamp}</p> 
@@ -330,13 +342,11 @@ export default function ViewMarket(props: any) {
                     
                     Closes in:  */}
 
-                    <p>Question ID: {data.spamPredictionMarket.questionId}</p>
-                    <p>Balancer Pool: {data.market.pool}</p>
-                    <p>Tokens: {tokens}</p>
-                </MarketOverview>
-
+                        <p>Question ID: {data.spamPredictionMarket.questionId}</p>
+                        <p>Balancer Pool: {data.market.pool}</p>
+                        <p>Tokens: {tokens}</p>
+                    </MarketOverview>
                 </Column>
-
 
                 <Column>
                     <YourBet>
@@ -356,62 +366,63 @@ export default function ViewMarket(props: any) {
                         <Heading as="h3" size="md">
                             Trade
                         </Heading>
-                        
                     </TokenSwapper>
                 </Column>
             </Row>
 
-            <Row>
-
-                
-            </Row>
+            <Row></Row>
         </>
     );
 }
 
-async function checkBalanceAndAllow(token: ethers.Contract, amount: BigNumber, holder: string, spender: string) {
-    let balance = ethers.constants.Zero
-    let allowance = ethers.constants.Zero
-    let error
+async function checkBalanceAndAllow(
+    token: ethers.Contract,
+    amount: BigNumber,
+    holder: string,
+    spender: string,
+) {
+    let balance = ethers.constants.Zero;
+    let allowance = ethers.constants.Zero;
+    let error;
 
     balance = await token.balanceOf(holder);
     if (balance.lt(amount)) {
-        error = new Error(`Token balance is too low. Balance: ${balance.toString()}, minimum buy: 1,000,000`)
-        return [balance, allowance, error]
+        error = new Error(`Token balance is too low. Balance: ${balance.toString()}, minimum buy: 1,000,000`);
+        return [balance, allowance, error];
     }
 
-    allowance = await token.allowance(
-        holder,
-        spender
-    )
+    allowance = await token.allowance(holder, spender);
     if (allowance.lt(amount)) {
         await token.approve(spender, ethers.constants.MaxUint256, { from: holder });
     }
 
-    return [balance, allowance, null]
+    return [balance, allowance, null];
 }
 
 const SpamSelector = (props: any) => {
     const { account, library } = useWeb3React();
     const { deployments } = useContractDeployments();
 
-
     async function onSelect(ev: any) {
         const { value } = ev.target;
-        purchase(value)
+        purchase(value);
     }
-    
+
     async function purchase(outcome: 'spam' | 'notspam') {
-        const outcomes = ['notspam', 'spam']
+        const outcomes = ['notspam', 'spam'];
         const signer = getSigner(library, account!);
-        const buyAmount = toWei('1')
+        const buyAmount = toWei('1');
 
         const market = new ethers.Contract(
             props.market,
             require('@curatem/contracts/abis/SpamPredictionMarket.json'),
             signer,
         );
-        const spamToken = new ethers.Contract(props.spamToken, require('@curatem/contracts/abis/ERC20.json'), library);
+        const spamToken = new ethers.Contract(
+            props.spamToken,
+            require('@curatem/contracts/abis/ERC20.json'),
+            library,
+        );
         const notSpamToken = new ethers.Contract(
             props.notSpamToken,
             require('@curatem/contracts/abis/ERC20.json'),
@@ -423,17 +434,21 @@ const SpamSelector = (props: any) => {
             signer,
         );
 
-
         const scripts = new ethers.Contract(
             deployments['Scripts'].address,
-            require("@curatem/contracts/abis/Scripts.json"),
-            getSigner(library, account!)
-        )
+            require('@curatem/contracts/abis/Scripts.json'),
+            getSigner(library, account!),
+        );
 
-        const [balance, allowance, error] = await checkBalanceAndAllow(collateralToken, buyAmount, account!, scripts.address)
-        if(error) {
+        const [balance, allowance, error] = await checkBalanceAndAllow(
+            collateralToken,
+            buyAmount,
+            account!,
+            scripts.address,
+        );
+        if (error) {
             setError(error.toString());
-            return
+            return;
         }
 
         await scripts.buyOutcomeElseProvideLiquidity(
@@ -444,8 +459,8 @@ const SpamSelector = (props: any) => {
             '10',
             deployments['UniswapV2Router02'].address,
             '10000',
-            '10000'
-        )
+            '10000',
+        );
     }
 
     const [error, setError] = useState('');
@@ -456,10 +471,9 @@ const SpamSelector = (props: any) => {
                 <option value="spam">Spam</option>
                 <option value="notspam">Not Spam</option>
             </Select>
-            
-            <br/>
+
+            <br />
             {error}
         </>
     );
 };
-

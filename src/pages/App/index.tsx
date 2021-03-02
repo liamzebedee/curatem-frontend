@@ -61,7 +61,12 @@ export default function App() {
                                     path="/communities/:community/markets/:market"
                                     component={ViewMarket}
                                 />
-                                <Route exact strict path="/communities/:community/markets" component={ViewMarkets} />
+                                <Route
+                                    exact
+                                    strict
+                                    path="/communities/:community/markets"
+                                    component={ViewMarkets}
+                                />
                                 {/* <Route exact strict path="/communities/:community" component={ViewCommunities} /> */}
                                 <Route exact strict path="/communities" component={ViewCommunities} />
                                 <Route exact strict path="/utils" component={Utils} />

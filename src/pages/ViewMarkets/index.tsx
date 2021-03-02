@@ -51,7 +51,9 @@ function buildRows(data: any) {
             cells: [
                 {
                     content: (
-                        <Link to={`/communities/${data.community.id}/markets/${market.id}`}>{market.itemUrl}</Link>
+                        <Link to={`/communities/${data.community.id}/markets/${market.id}`}>
+                            {market.itemUrl}
+                        </Link>
                     ),
                 },
                 {

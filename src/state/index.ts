@@ -1,5 +1,5 @@
-import { configureStore, getDefaultMiddleware } from '@reduxjs/toolkit'
-import { save, load } from 'redux-localstorage-simple'
+import { configureStore, getDefaultMiddleware } from '@reduxjs/toolkit';
+import { save, load } from 'redux-localstorage-simple';
 
 // import application from './application/reducer'
 // import { updateVersion } from './global/actions'
@@ -9,25 +9,25 @@ import { save, load } from 'redux-localstorage-simple'
 // import mint from './mint/reducer'
 // import lists from './lists/reducer'
 // import burn from './burn/reducer'
-import reddit from './reddit/reducer'
-import markets from './markets/reducer'
-import {reducer as balancerSwapper } from '../components/BalancerSwapper'
+import reddit from './reddit/reducer';
+import markets from './markets/reducer';
+import { reducer as balancerSwapper } from '../components/BalancerSwapper';
 
-const PERSISTED_KEYS: string[] = ['user', 'transactions', 'lists']
+const PERSISTED_KEYS: string[] = ['user', 'transactions', 'lists'];
 
 const store = configureStore({
-  reducer: {
-    reddit,
-    markets,
-    balancerSwapper
-  },
-  middleware: [...getDefaultMiddleware({ thunk: true }), save({ states: PERSISTED_KEYS })],
-  preloadedState: load({ states: PERSISTED_KEYS })
-})
+    reducer: {
+        reddit,
+        markets,
+        balancerSwapper,
+    },
+    middleware: [...getDefaultMiddleware({ thunk: true }), save({ states: PERSISTED_KEYS })],
+    preloadedState: load({ states: PERSISTED_KEYS }),
+});
 
 // store.dispatch(updateVersion())
 
-export default store
+export default store;
 
-export type AppState = ReturnType<typeof store.getState>
-export type AppDispatch = typeof store.dispatch
+export type AppState = ReturnType<typeof store.getState>;
+export type AppDispatch = typeof store.dispatch;

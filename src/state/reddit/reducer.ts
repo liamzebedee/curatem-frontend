@@ -1,20 +1,19 @@
-import { createReducer } from '@reduxjs/toolkit'
-import { loadItem } from './actions'
+import { createReducer } from '@reduxjs/toolkit';
+import { loadItem } from './actions';
 
 export interface RedditAPIObject {
-  [k: string]: any
+    [k: string]: any;
 }
 
 export interface RedditState {
-  [itemUrl: string]: RedditAPIObject
+    [itemUrl: string]: RedditAPIObject;
 }
 
-const initialState: RedditState = {
-}
+const initialState: RedditState = {};
 
-export default createReducer<RedditState>(initialState, builder =>
-  builder.addCase(loadItem, (state, { payload: { itemUrl, response } }) => {
-    state[itemUrl] = response
-    return state
-  })
-)
+export default createReducer<RedditState>(initialState, (builder) =>
+    builder.addCase(loadItem, (state, { payload: { itemUrl, response } }) => {
+        state[itemUrl] = response;
+        return state;
+    }),
+);

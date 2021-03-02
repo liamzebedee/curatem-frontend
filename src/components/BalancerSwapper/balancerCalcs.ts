@@ -9,7 +9,7 @@ export function calcOutGivenIn(
     tokenBalanceOut: BigNumber,
     tokenWeightOut: BigNumber,
     tokenAmountIn: BigNumber,
-    swapFee: BigNumber
+    swapFee: BigNumber,
 ): BigNumber {
     const weightRatio = bdiv(tokenWeightIn, tokenWeightOut);
     let adjustedIn = BONE.sub(swapFee);
@@ -27,7 +27,7 @@ export function calcInGivenOut(
     tokenBalanceOut: BigNumber,
     tokenWeightOut: BigNumber,
     tokenAmountOut: BigNumber,
-    swapFee: BigNumber
+    swapFee: BigNumber,
 ) {
     const weightRatio = bdiv(tokenWeightOut, tokenWeightIn);
     const diff = tokenBalanceOut.sub(tokenAmountOut);
@@ -44,7 +44,7 @@ export function calcSpotPrice(
     tokenWeightIn: BigNumber,
     tokenBalanceOut: BigNumber,
     tokenWeightOut: BigNumber,
-    swapFee: BigNumber
+    swapFee: BigNumber,
 ) {
     const numer = bdiv(tokenBalanceIn, tokenWeightIn);
     const denom = bdiv(tokenBalanceOut, tokenWeightOut);
@@ -75,10 +75,7 @@ function bfloor(a: BigNumber): BigNumber {
     return btoi(a).mul(BONE);
 }
 
-function bsubSign(
-    a: BigNumber,
-    b: BigNumber
-): { res: BigNumber; bool: boolean } {
+function bsubSign(a: BigNumber, b: BigNumber): { res: BigNumber; bool: boolean } {
     if (a.gte(b)) {
         const res = a.sub(b);
         const bool = false;
@@ -119,11 +116,7 @@ function bpow(base: BigNumber, exp: BigNumber): BigNumber {
     return bmul(wholePow, partialResult);
 }
 
-function bpowApprox(
-    base: BigNumber,
-    exp: BigNumber,
-    precision: BigNumber
-): BigNumber {
+function bpowApprox(base: BigNumber, exp: BigNumber, precision: BigNumber): BigNumber {
     const a = exp;
     const { res: x, bool: xneg } = bsubSign(base, BONE);
     let term = BONE;
