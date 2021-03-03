@@ -26,3 +26,7 @@ export function toWei(amount: string) {
 export function fromWei(amount: string) {
     return ethers.utils.formatEther(BigNumber.from(amount));
 }
+
+export function toPercent(number: string): string {
+    return (parseFloat(number) * 100).toFixed(1)
+}

@@ -1,3 +1,4 @@
+import { ChainId, Fetcher, Pair, Token, Route, JSBI, Fraction } from '@uniswap/sdk';
 import { NETWORK_CHAIN_ID } from 'connectors';
 import { ethers } from 'ethers';
 import gql from 'graphql-tag';
@@ -8,7 +9,6 @@ const omenClient = getApolloClient(NETWORK_CHAIN_ID);
 
 export interface MarketData {
     state?: 'open' | 'resolving' | 'resolved';
-    pool: string;
 }
 
 export interface Community {
@@ -47,6 +47,7 @@ const marketQuery = gql`
 
 interface QuestionData {
     question: {
+        id: string;
         openingTimestamp: string;
         timeout: string;
         currentAnswer: any;
@@ -60,6 +61,7 @@ interface QuestionData {
 const questionQuery = gql`
     query GetQuestion($id: ID!) {
         question(id: $id) {
+            id,
             openingTimestamp
             timeout
             currentAnswer
@@ -70,6 +72,8 @@ const questionQuery = gql`
         }
     }
 `;
+
+
 
 export async function loadMarket(account: any, library: any, marketId: string) {
     const marketQueryResult = await client.query<SpamPredictionMarketData>({
@@ -105,16 +109,12 @@ export async function loadMarket(account: any, library: any, marketId: string) {
         library,
     );
 
-    const pool = await market.pool();
-    console.debug(`Pool exists? ${pool}`);
-
     const spamToken_balance = await spamToken.balanceOf(account);
     const notSpamToken_balance = await notSpamToken.balanceOf(account);
     const totalVolume = await spamToken.totalSupply();
 
     const nowInSeconds = Math.floor(+new Date() / 1000);
     const marketData: MarketData = {
-        pool,
     };
 
     const { data: questionData, error } = await omenClient.query<QuestionData>({
@@ -145,16 +145,83 @@ export async function loadMarket(account: any, library: any, marketId: string) {
         marketData.state = 'open';
     }
 
-    console.debug(spamToken_balance, notSpamToken_balance, totalVolume, questionData);
+    let uniSpamToken = new Token(ChainId.KOVAN, spamToken.address, 18, "SPAM")
+    let uniNotSpamToken = new Token(ChainId.KOVAN, notSpamToken.address, 18, "NOT-SPAM")
+    let uniCollateralToken = new Token(ChainId.KOVAN, data.community.token, 18, "REP")
+
+    const pairSpamCollateral = await Fetcher.fetchPairData(uniSpamToken, uniCollateralToken, library)
+    const pairNotSpamCollateral = await Fetcher.fetchPairData(uniNotSpamToken, uniCollateralToken, library)
+    
+    function getUniswapPoolInfo(pair: Pair, token: Token) {
+        console.debug(`Getting info for ${pair.token0.symbol}/${pair.token1.symbol} pool`)
+        console.debug(`Reserves: ${pair.reserve0.toFixed(5)} ${pair.token0.symbol}, ${pair.reserve1.toFixed(5)} ${pair.token1.symbol}`)
+        if(pair.reserveOf(token).equalTo(JSBI.BigInt(0))) {
+            // if the pool is empty, then we return the price as 1.
+            return new Fraction(
+                JSBI.BigInt(1),
+                JSBI.BigInt(1)
+            )
+        }
+
+        const route = new Route([pair], token)
+        return route.midPrice
+    }
+    
+    async function getBalance(tokenAddress: string) {
+        const token = new ethers.Contract(
+            tokenAddress,
+            require('@curatem/contracts/abis/ERC20.json'),
+            library
+        );
+        return await token.balanceOf(account)
+    }
+    
+    let amm = {
+        prices: {
+            spam: '',
+            notspam: ''
+        },
+        reserves: {
+            spam: pairSpamCollateral.reserveOf(uniSpamToken).toFixed(6),
+            notspam: pairNotSpamCollateral.reserveOf(uniNotSpamToken).toFixed(6)
+        },
+        lpshares: {
+            spam: await getBalance(pairSpamCollateral.liquidityToken.address),
+            notspam: await getBalance(pairNotSpamCollateral.liquidityToken.address)
+        }
+    }
+
+    
+
+    let midPrices = [
+        getUniswapPoolInfo(pairNotSpamCollateral, uniNotSpamToken),
+        getUniswapPoolInfo(pairSpamCollateral, uniSpamToken)
+    ]
+
+    let sumPrices = midPrices.reduce(
+        (prev, curr) => prev.add(curr),
+        new Fraction(JSBI.BigInt(0), JSBI.BigInt(1))
+    )
+
+    // Odds are determined by normalising the price of each outcome token.
+    console.debug('midPrices', midPrices.map(price => price.toFixed(5)).join(','))
+    let odds = midPrices.map(price => price.divide(sumPrices))
+    
+    amm.prices.notspam = odds[0].toFixed(6)
+    amm.prices.spam = odds[1].toFixed(6)
+    
+    console.debug(odds)
 
     return {
         user: {
             spamToken_balance,
             notSpamToken_balance,
         },
+        amm,
         totalVolume,
         market: marketData,
         question,
         ...marketQueryResult.data,
     };
 }
+

@@ -1,15 +1,17 @@
-import { Heading, Select } from '@chakra-ui/react';
+import { Button, Heading, Progress, Select } from '@chakra-ui/react';
 import { RouteComponentProps } from '@reach/router';
+import { CurrencyAmount, TokenAmount } from '@uniswap/sdk';
 import { useWeb3React } from '@web3-react/core';
 import { loadMarket } from 'data/market';
 import { BigNumber, ethers } from 'ethers';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useQuery as useReactQuery } from 'react-query';
 import { useRedditPostAPI, useRedditState } from 'state/reddit/hooks';
 import styled from 'styled-components';
-import { fromWei, toWei } from 'utils';
+import { fromWei, shortenAddress, toPercent, toWei } from 'utils';
 import { getSigner } from 'utils/getLibrary';
+import { generateRealityEthLink } from 'utils/links';
 import { useContractDeployments } from '../../hooks/useContractDeployments';
 
 interface ViewMarketProps extends RouteComponentProps {
@@ -76,7 +78,28 @@ const MarketOverview = styled.div`
     padding: 1em;
     width: 1000px;
     justify-self: left;
+
+    table {
+        width: 100%;
+    }
+    thead {
+        border-top: 1px solid #ddd;
+        border-bottom: 1px solid #ddd;
+        text-align: left;
+    }
+    
+    th,
+    td {
+        padding: 0.25rem 1rem;
+    }
 `;
+
+const MarketTableRow = styled.div`
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+`
+
 
 const TokenSwapper = styled.div`
     display: block;
@@ -89,6 +112,18 @@ const TokenSwapper = styled.div`
 `;
 
 
+const InlineList = styled.ul`
+    display: grid;
+    list-style: none;
+    grid-template-columns: repeat(3,minmax(80px,auto));
+    
+    > li {
+        margin-right: 2rem;
+        display: inline-block;
+    }
+`
+
+
 const MarketStateIcon = ({ state }: { state: string }) => {
     return <>{state.toUpperCase()}</>;
 };
@@ -96,7 +131,7 @@ const MarketStateIcon = ({ state }: { state: string }) => {
 export default function ViewMarket(props: any) {
     const { market } = props.match.params;
 
-    const { account, library } = useWeb3React();
+    const { account, library, chainId } = useWeb3React();
     const { data, isLoading: loading, error } = useReactQuery<any, Error>(
         ['load-market', market],
         () => loadMarket(account, library, market),
@@ -158,17 +193,94 @@ export default function ViewMarket(props: any) {
                             Prediction market
                         </Heading>
 
-                        <MarketStateIcon state={data.market.state} />
+                        <div>
+                            <InlineList>
+                                <li>
+                                    <MarketStateIcon state={data.market.state} />
+                                </li>
+                                
+                                <li>
+                                    { data.market.state !== 'resolved' 
+                                    ? <p><strong>Closes in</strong>: {data.question.openingTimestamp}</p> 
+                                    : null }
+                                </li>
+                                
+                                <li>
+                                    <strong>Total volume</strong>: {CurrencyAmount.ether(data.totalVolume).toFixed(6)}
+                                </li>
 
-                        {/* { data.market.state !== 'resolved' 
-                    ? <p>Closes in {question.openingTimestamp}</p> 
-                    : null }
-                    
-                    Closes in:  */}
+                                <li>
+                                    <strong>Oracle:</strong> <a href={generateRealityEthLink(data.question.id)}>reality.eth</a>
+                                </li>
+                                
+                                <li>
+                                    <strong>Adjudicator</strong>: moderator multisig ({ shortenAddress(data.spamPredictionMarket.community.moderator) })
+                                </li>
+                            </InlineList>
+                        </div>
 
-                        <p>Question ID: {data.spamPredictionMarket.questionId}</p>
-                        <p>Balancer Pool: {data.market.pool}</p>
-                        <p>Tokens: {tokens}</p>
+                        <br/>
+
+                        <div style={{ margin: '0 -1rem' }}>
+                            <table>
+                                <thead>
+                                    <th>Outcome/probability</th>
+                                    <th>Liquidity</th>
+                                    {/* <th>Volume</th> */}
+                                    <th>My shares</th>
+                                    <th>My LP shares</th>
+                                </thead>
+                                <tbody>
+                                    {
+                                        [
+                                            {
+                                                outcomeName: "Spam",
+                                                outcomeTokenSymbol: "SPAM",
+                                                odds: toPercent(data.amm.prices.spam),
+                                                reserves: data.amm.reserves.spam,
+                                                myShares: CurrencyAmount.ether(data.user.spamToken_balance),
+                                                myLPShares: CurrencyAmount.ether(data.amm.lpshares.spam)
+                                            },
+                                            {
+                                                outcomeName: "Not Spam",
+                                                outcomeTokenSymbol: "NOT-SPAM",
+                                                odds: toPercent(data.amm.prices.notspam),
+                                                reserves: data.amm.reserves.notspam,
+                                                myShares: CurrencyAmount.ether(data.user.notSpamToken_balance),
+                                                myLPShares: CurrencyAmount.ether(data.amm.lpshares.notspam)
+                                            }
+                                        ].map(({ outcomeName, outcomeTokenSymbol, odds, reserves, myShares, myLPShares }) => <tr>
+                                            <td width={400}>
+                                                <MarketTableRow>
+                                                    <header style={{ flex: 1 }} className="outcome">{ outcomeName }</header>
+                                                    <span className="odds">{ odds }%</span>
+                                                </MarketTableRow>
+        
+                                                <MarketTableRow>
+                                                    <div style={{ flex: 1 }}>
+                                                        <Progress colorScheme="green" size="sm" value={parseFloat(odds)} />
+                                                    </div>
+                                                </MarketTableRow>
+                                            </td>
+                                            
+                                            <td width={100}>
+                                                {reserves}
+                                            </td>
+        
+                                            <td width={125}>
+                                                <p>{myShares.toFixed(6)}</p>
+                                            </td>
+
+                                            <td width={125}>
+                                                <p>{myLPShares.toFixed(6)}</p>
+                                            </td>
+                                        </tr>)
+                                    }
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+
                     </MarketOverview>
                 </Column>
 
@@ -178,12 +290,10 @@ export default function ViewMarket(props: any) {
                             Your bet
                         </Heading>
                         
-                        <div>
-                            <SpamSelector 
-                                balances={[data.user.notSpamToken_balance, data.user.spamToken_balance]}
-                                {...data.spamPredictionMarket} 
-                                market={data.spamPredictionMarket.id} />
-                        </div>
+                        <SpamSelector 
+                            balances={[data.user.notSpamToken_balance, data.user.spamToken_balance]}
+                            {...data.spamPredictionMarket} 
+                            market={data.spamPredictionMarket.id} />
                     </YourBet>
 
                     <TokenSwapper>
@@ -191,8 +301,8 @@ export default function ViewMarket(props: any) {
                             Trade
                         </Heading>
 
-                        <p>{fromWei(data.user.spamToken_balance)} SPAM</p>
-                        <p>{fromWei(data.user.notSpamToken_balance)} NOT-SPAM</p>
+                        {/* <p>{fromWei(data.user.spamToken_balance)} SPAM</p>
+                        <p>{fromWei(data.user.notSpamToken_balance)} NOT-SPAM</p> */}
                     </TokenSwapper>
                 </Column>
             </Row>
@@ -226,6 +336,7 @@ async function checkBalanceAndAllow(
     return [balance, allowance, null];
 }
 
+const outcomes = ['Not Spam', 'Spam']
 const SpamSelector = (props: any) => {
     const { account, library } = useWeb3React();
     const { deployments } = useContractDeployments();
@@ -240,7 +351,7 @@ const SpamSelector = (props: any) => {
         purchase(value);
     }
 
-    async function purchase(outcome: 'spam' | 'notspam') {
+    async function purchase(outcome: number) {
         setState({
             loading: true,
             error: ''
@@ -290,17 +401,35 @@ const SpamSelector = (props: any) => {
             })
             return;
         }
+        
+        try {
+            let res = await scripts.buyOutcomeElseProvideLiquidity(
+                market.address,
+                outcome,
+                buyAmount,
+                '9',
+                '10',
+                deployments['UniswapV2Router02'].address,
+                '10000',
+                '10000',
+            )
+            await res.wait(1)
+        } catch(ex) {
+            // Tx refused.
+            // TODO: hacky way to handle transactions.
+            if(ex.code == 4001) {
+                setState({
+                    loading: false,
+                    error: ''
+                })
+                return 
+            }
 
-        await scripts.buyOutcomeElseProvideLiquidity(
-            market.address,
-            outcomes.indexOf(outcome),
-            buyAmount,
-            '9',
-            '10',
-            deployments['UniswapV2Router02'].address,
-            '10000',
-            '10000',
-        )
+            setState({
+                loading: false,
+                error: ex.toString()
+            })
+        }
 
         setState({
             loading: false,
@@ -308,35 +437,36 @@ const SpamSelector = (props: any) => {
         })
     }
 
-    const outcomes = ['Not Spam', 'Spam']
-    const balances = props.balances
+    const lastKnownBet = useMemo(function computeLastKnownBet() {
+        const balances = props.balances
 
-    let defaultSelection = undefined
-    let largestIdx = 0
-    for(let i = 0; i < balances.length; i++) {
-        if(balances[i].gt(balances[largestIdx])) 
-            largestIdx = i
-    }
-
-    if(!balances[largestIdx].eq(ethers.constants.Zero)) {
-        defaultSelection = largestIdx
-    }
-    
+        let defaultSelection = undefined
+        let largestIdx = 0
+        for(let i = 0; i < balances.length; i++) {
+            if(balances[i].gt(balances[largestIdx])) 
+                largestIdx = i
+        }
+        
+        // If the largest balance is 0, then default selection remains as undefined.
+        if(!balances[largestIdx].eq(ethers.constants.Zero)) {
+            defaultSelection = largestIdx
+        }
+        return defaultSelection
+    }, props.balances)
 
     return (
-        <div>
+        <>
             <Select 
                 placeholder="None" 
                 disabled={state.loading} 
                 onChange={onSelect}
-                defaultValue={defaultSelection}>
+                defaultValue={lastKnownBet}>
                     {outcomes.map((outcome, idx) => {
                         return <option key={idx} value={idx}>{outcome}</option>
                     })}
             </Select>
 
-            <br />
-            {state.error}
-        </div>
+            { state.error }
+        </>
     );
 };
