@@ -15,6 +15,10 @@ interface Window {
     web3?: unknown;
 }
 
+// interface Intl {
+//     RelativeTimeFormatUnit: unknown
+// }
+
 declare module 'content-hash' {
     declare function decode(x: string): string;
     declare function getCodec(x: string): string;

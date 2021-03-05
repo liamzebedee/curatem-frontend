@@ -13,7 +13,7 @@ export interface MarketData {
 
 export interface Community {
     id: string
-    moderator: string
+    moderatorArbitrator: string
     token: string
 }
 
@@ -37,7 +37,7 @@ const marketQuery = gql`
             notSpamToken
 
             community {
-                moderator
+                moderatorArbitrator
                 token
                 id
             }
@@ -45,53 +45,252 @@ const marketQuery = gql`
     }
 `;
 
-interface QuestionData {
-    question: {
-        id: string;
-        openingTimestamp: string;
-        timeout: string;
-        currentAnswer: any;
-        currentAnswerTimestamp: string;
-        arbitrator: string;
-        isPendingArbitration: boolean;
-        answerFinalizedTimestamp: string;
-    };
+interface Question extends Record<string, any> {
+    id: string;
+    openingTimestamp: string;
+    timeout: string;
+    currentAnswer: any;
+    currentAnswerTimestamp: string;
+    arbitrator: string;
+    isPendingArbitration: boolean;
+    answerFinalizedTimestamp: string;
+    arbitrationRequestedTimestamp: string
+    arbitrationRequestedBy: string
+
+    answers: QuestionAnswer[]
 }
+
+interface QuestionAnswer {
+    id: string
+    timestamp: string
+    answer: string
+    bondAggregate: string
+}
+interface QuestionData {
+    question: Question
+}
+
+
+// id,
+// openingTimestamp
+// timeout
+// currentAnswer
+// currentAnswerTimestamp
+// arbitrator
+// isPendingArbitration
+// answerFinalizedTimestamp,
 
 const questionQuery = gql`
     query GetQuestion($id: ID!) {
         question(id: $id) {
-            id,
+            id
+
+            templateId
+            data
+            title
+            outcomes
+            category
+            language
+
+            arbitrator
             openingTimestamp
             timeout
+
             currentAnswer
+            currentAnswerBond
             currentAnswerTimestamp
-            arbitrator
+
+            arbitrationRequestedTimestamp
+            arbitrationRequestedBy
             isPendingArbitration
+            arbitrationOccurred
+
             answerFinalizedTimestamp
+
+            answers {
+                id,
+                timestamp,
+                answer,
+                bondAggregate
+            } 
         }
     }
 `;
 
-
-
-export async function loadMarket(account: any, library: any, marketId: string) {
-    const marketQueryResult = await client.query<SpamPredictionMarketData>({
+async function loadMarketFromSubgraph(marketId: string) {
+    const queryResult = await client.query<SpamPredictionMarketData>({
         query: marketQuery,
         variables: {
             id: marketId,
         },
     });
 
-    if (marketQueryResult.error) {
-        throw new Error(`Error getting market data from Graph - ${marketQueryResult.error.toString()}`);
+    if (queryResult.error) {
+        throw new Error(`Error getting market data from Graph - ${queryResult.error.toString()}`);
     }
 
-    if (marketQueryResult.data === null) {
+    if (queryResult.data.spamPredictionMarket == null) {
         throw new Error('Market could not be found');
     }
 
-    const data = marketQueryResult.data.spamPredictionMarket;
+    return queryResult.data.spamPredictionMarket;
+}
+
+async function loadQuestionFromSubgraph(questionId: string) {
+    const queryResult = await omenClient.query<QuestionData>({
+        query: questionQuery,
+        variables: {
+            id: questionId,
+        },
+    });
+
+    if (queryResult.error) {
+        throw new Error(`Error getting question data from Graph - ${queryResult.error.toString()}`);
+    }
+
+    if (queryResult.data.question == null) {
+        throw new Error('Realitio question could not be found');
+    }
+
+    return queryResult.data.question
+}
+
+export interface RealitioEvent {
+    time: number
+    type: string
+}
+
+
+export interface CreationEvent extends RealitioEvent {
+    type: 'created'
+}
+export interface AnswerPosted extends RealitioEvent {
+    type: 'answer-posted'
+    bond: string
+    answer: string
+}
+
+export interface ArbitrationRequested extends RealitioEvent {
+    type: 'arbitration-requested'
+    by: string
+}
+
+export interface ArbitrationAnswer extends RealitioEvent {
+    type: 'arbitration-answer'
+    answer: string
+}
+
+export interface Finalised extends RealitioEvent {
+    type: 'finalised'
+    answer: string
+}
+
+export interface AwaitingAnswer extends RealitioEvent {
+    type: 'awaiting-answer'
+    remainingTimer: number
+}
+
+async function buildRealitioHistory(questionId: string, question: Question) {
+    let events = []
+    
+    const created: CreationEvent = {
+        type: 'created',
+        time: parseInt(question.openingTimestamp)
+    }
+    events.push(created)
+
+
+    question.answers.forEach(answer => {
+        const answerPosted: AnswerPosted = {
+            type: 'answer-posted',
+            time: parseInt(answer.timestamp),
+            bond: answer.bondAggregate,
+            answer: answer.answer
+        }
+        events.push(answerPosted)
+    })
+
+    if(question.isPendingArbitration) {
+        const arbitrationRequested: ArbitrationRequested = {
+            type: 'arbitration-requested',
+            time: parseInt(question.arbitrationRequestedTimestamp),
+            by: question.arbitrationRequestedBy
+        }
+        events.push(arbitrationRequested)
+    }
+
+    if(question.arbitrationOccurred) {
+        const arbitrationAnswer: ArbitrationAnswer = {
+            type: 'arbitration-answer',
+            time: parseInt(question.answerFinalizedTimestamp),
+            answer: question.currentAnswer
+        }
+        events.push(arbitrationAnswer)
+
+        const finalised: Finalised = {
+            type: 'finalised',
+            time: parseInt(question.answerFinalizedTimestamp),
+            answer: question.currentAnswer
+        }
+        events.push(finalised)
+    }
+
+    if(
+        question.currentAnswerTimestamp &&
+        !question.isPendingArbitration  
+    ) {
+        const nowInSeconds = Math.floor(+new Date() / 1000);
+        const currentAnswerTimestamp = parseInt(question.currentAnswerTimestamp)
+        const timeout = parseInt(question.timeout)
+
+        let remainingTimer = (currentAnswerTimestamp + timeout) - nowInSeconds
+        if(remainingTimer < 0) {
+            const finalised: Finalised = {
+                type: 'finalised',
+                time: currentAnswerTimestamp + timeout,
+                answer: question.currentAnswer
+            }
+            events.push(finalised)
+        } else {
+            // Still waiting answer. Show timeout.
+            // TODO
+            const ev: AwaitingAnswer = {
+                time: nowInSeconds,
+                type: 'awaiting-answer',
+                remainingTimer
+            }
+            events.push(ev)
+        }
+    }
+
+    return events.reverse()
+}
+
+// class RealitioUtils {
+//     static determineStatus(question) {
+//         // A question is asked.
+//         // Anyone may provide an answer with a bond within the question timeframe.
+
+//         // You post a question to the askQuestion() function, specifiying:
+//         // The question text and terms. (See "Encoding questions" below.)
+//         // The timeout, which is how many seconds since the last answer the system will wait before finalizing on it.
+//         // The arbitrator, which is the address of a contract that will be able to intervene and decide the final answer, in return for a fee.
+//         // Anyone can post an answer by calling the submitAnswer() function. They must supply a bond with their answer.
+//         // Supplying an answer sets their answer as the "official" answer, and sets the clock ticking until the timeout elapses and system finalizes on that answer.
+//         // Anyone can either a different answer or the same answer again. Each time they must supply at least double the previous bond. Each new answer resets the timeout clock.
+//         // Prior to finalization, anyone can pay an arbitrator contract to make a final judgement. Doing this freezes the system until the arbitrator makes their judgement and sends a submitAnswerByArbitrator() transaction to the contract.
+//         // Once the timeout from the last answer has elapsed, the system considers it final.
+//         // Once finalized, anyone can run the claimWinnings() function to distribute the bounty and bonds to each owner's balance, still held in the contract.
+//         // Users can call withdraw() to take ETH held in their balance out of the contract.
+
+//     }
+// }
+
+
+
+
+export async function loadMarket(account: any, library: any, marketId: string) {
+    const data = await loadMarketFromSubgraph(marketId)
 
     const spamToken = new ethers.Contract(
         data.spamToken,
@@ -117,28 +316,16 @@ export async function loadMarket(account: any, library: any, marketId: string) {
     const marketData: MarketData = {
     };
 
-    const { data: questionData, error } = await omenClient.query<QuestionData>({
-        query: questionQuery,
-        variables: {
-            id: data.questionId,
-        },
-    });
-    const { question } = questionData;
+    const questionData = await loadQuestionFromSubgraph(data.questionId)
+    const questionHistory = await buildRealitioHistory(data.questionId, questionData)
+    console.debug('questionHistory', questionHistory)
 
-    if (error) {
-        throw new Error(`Error getting question data from Graph - ${error.toString()}`);
-    }
-
-    if (question == null) {
-        throw new Error('Realitio question could not be found');
-    }
-
-    if (question.answerFinalizedTimestamp != null) {
+    if (questionData.answerFinalizedTimestamp != null) {
         marketData.state = 'resolved';
     } else if (
-        question.isPendingArbitration ||
-        question.currentAnswerTimestamp != null ||
-        parseInt(question.openingTimestamp) < nowInSeconds
+        questionData.isPendingArbitration ||
+        questionData.currentAnswerTimestamp != null ||
+        parseInt(questionData.openingTimestamp) < nowInSeconds
     ) {
         marketData.state = 'resolving';
     } else {
@@ -220,8 +407,9 @@ export async function loadMarket(account: any, library: any, marketId: string) {
         amm,
         totalVolume,
         market: marketData,
-        question,
-        ...marketQueryResult.data,
+        question: questionData,
+        spamPredictionMarket: data,
+        questionHistory
     };
 }
 

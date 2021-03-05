@@ -1,18 +1,22 @@
-import { Button, Heading, Progress, Select } from '@chakra-ui/react';
+import { Button, Heading, Progress, Select, Link, Tooltip } from '@chakra-ui/react';
 import { RouteComponentProps } from '@reach/router';
 import { CurrencyAmount, TokenAmount } from '@uniswap/sdk';
 import { useWeb3React } from '@web3-react/core';
-import { loadMarket } from 'data/market';
+import { AnswerPosted, ArbitrationAnswer, ArbitrationRequested, AwaitingAnswer, CreationEvent, Finalised, loadMarket } from 'data/market';
 import { BigNumber, ethers } from 'ethers';
 import React, { useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useQuery as useReactQuery } from 'react-query';
 import { useRedditPostAPI, useRedditState } from 'state/reddit/hooks';
 import styled from 'styled-components';
-import { fromWei, shortenAddress, toPercent, toWei } from 'utils';
+import { fromWei, shortenAddress, timeAgo, toPercent, toRelativeTs, toWei } from 'utils';
 import { getSigner } from 'utils/getLibrary';
-import { generateRealityEthLink } from 'utils/links';
+import { generateEtherscanLink, generateRealityEthLink, generateUniswapTradeLink } from 'utils/links';
 import { useContractDeployments } from '../../hooks/useContractDeployments';
+import { UniswapSwapper } from '../../components/UniswapSwapper'
+import { ExternalLinkIcon } from '@chakra-ui/icons';
+import { Question } from 'utils/types';
+import { DateTime } from 'luxon';
 
 interface ViewMarketProps extends RouteComponentProps {
     market?: string;
@@ -94,6 +98,21 @@ const MarketOverview = styled.div`
     }
 `;
 
+const RealitioHistory = styled.div`
+    display: block;
+    border: 1px solid #ddd;
+    padding: 1em;
+    width: 1000px;
+    justify-self: left;
+    > div {
+        margin-top: 1rem;
+    }
+`
+
+const RealitioHistoryItem = styled.div`
+    margin-bottom: 1rem;
+`
+
 const MarketTableRow = styled.div`
     display: flex;
     flex-direction: row;
@@ -109,6 +128,16 @@ const TokenSwapper = styled.div`
     border: 1px solid #ddd;
     padding: 1em;
     width: 400px;
+
+    iframe {
+
+        border: 0;
+        margin: 0 auto;
+        display: block;
+        border-radius: 10px;
+        max-width: 600px;
+        min-width: 300px;
+    }
 `;
 
 
@@ -124,9 +153,46 @@ const InlineList = styled.ul`
 `
 
 
+
+
 const MarketStateIcon = ({ state }: { state: string }) => {
     return <>{state.toUpperCase()}</>;
 };
+
+function getOutcomeFromIndex(question: Question, index: string) {
+    return question.outcomes[BigNumber.from(index).toNumber()]
+}
+
+type QuestionEvent = CreationEvent | AnswerPosted | ArbitrationRequested | ArbitrationAnswer | Finalised | AwaitingAnswer
+
+function getEventDescription(question: Question, event: QuestionEvent) {
+    switch(event.type) {
+        case 'created':
+            return <>
+                Market created
+            </>
+        case 'answer-posted':
+            return <>
+                Answer submitted - {getOutcomeFromIndex(question, event.answer)} - with bond {CurrencyAmount.ether(event.bond).toFixed(6)} ETH
+            </>
+        case 'arbitration-requested':
+            return <>
+                Arbitration requested by {event.by}
+            </>
+        case 'arbitration-answer':
+            return <>
+                Arbitrator set official answer - {getOutcomeFromIndex(question, event.answer)}
+            </>
+        case 'finalised':
+            return <>
+                Answer finalised - {getOutcomeFromIndex(question, event.answer)}
+            </>
+        case 'awaiting-answer':
+            return <>
+                Market will auto-resolve in {event.remainingTimer}s if answer isn't disputed and arbitration isn't requested.
+            </>
+    }
+}
 
 export default function ViewMarket(props: any) {
     const { market } = props.match.params;
@@ -162,18 +228,24 @@ export default function ViewMarket(props: any) {
         data.spamPredictionMarket.community.token,
     ];
 
+    
+
     return (
         <>
             <Row>
                 <Column>
                     <PostContent>
                         <Heading as="h3" size="md">
-                            Post content
+                            Post title
                         </Heading>
 
-                        <PostContentPreview>
+                        <div>
+                        { redditPost && redditPost.title }
+                        </div>
+
+                        {/* <PostContentPreview>
                             <ReactMarkdown>{redditPost && redditPost.selftext}</ReactMarkdown>
-                        </PostContentPreview>
+                        </PostContentPreview> */}
 
                         <Heading as="h3" size="md">
                             Author
@@ -183,9 +255,9 @@ export default function ViewMarket(props: any) {
                         <Heading as="h3" size="md">
                             Posted
                         </Heading>
-                        <a href={data.spamPredictionMarket.itemUrl} target="_blank" rel="noreferrer">
-                            {redditPost && new Date(redditPost.created * 1000).toString()}
-                        </a>
+                        <Link href={data.spamPredictionMarket.itemUrl} isExternal>
+                            {redditPost && DateTime.fromMillis(redditPost.created * 1000).toRFC2822()} <ExternalLinkIcon mx="2px" />
+                        </Link>
                     </PostContent>
 
                     <MarketOverview>
@@ -200,9 +272,7 @@ export default function ViewMarket(props: any) {
                                 </li>
                                 
                                 <li>
-                                    { data.market.state !== 'resolved' 
-                                    ? <p><strong>Closes in</strong>: {data.question.openingTimestamp}</p> 
-                                    : null }
+                                    <p><strong>Created</strong>: {DateTime.fromMillis(data.question.openingTimestamp * 1000).toRFC2822()}</p>
                                 </li>
                                 
                                 <li>
@@ -210,11 +280,14 @@ export default function ViewMarket(props: any) {
                                 </li>
 
                                 <li>
-                                    <strong>Oracle:</strong> <a href={generateRealityEthLink(data.question.id)}>reality.eth</a>
+                                    <strong>Oracle:</strong> <Link href={generateRealityEthLink(data.question.id)} isExternal>reality.eth <ExternalLinkIcon mx="2px" /></Link>
                                 </li>
                                 
                                 <li>
-                                    <strong>Adjudicator</strong>: moderator multisig ({ shortenAddress(data.spamPredictionMarket.community.moderator) })
+                                    <strong>Arbitrator</strong>: Community Moderators (
+                                        <Link href={generateEtherscanLink('address', data.spamPredictionMarket.community.moderatorArbitrator)}>
+                                            { shortenAddress(data.spamPredictionMarket.community.moderatorArbitrator) } <ExternalLinkIcon mx="2px" />
+                                        </Link>)
                                 </li>
                             </InlineList>
                         </div>
@@ -282,6 +355,30 @@ export default function ViewMarket(props: any) {
                         </div>
 
                     </MarketOverview>
+
+                    <RealitioHistory>
+                        <Heading as="h3" size="md">
+                            History
+                        </Heading>
+
+                        <div>
+                            {
+                                data.questionHistory.map((event: QuestionEvent) => {
+                                    const description = getEventDescription(data.question, event)
+                                    const date = DateTime.fromMillis(event.time * 1000)
+                                    return <RealitioHistoryItem>
+                                        <div>{description}.</div>
+                                        
+                                        <div>
+                                            <Tooltip label={date.toRFC2822()} aria-label={date.toISO()}>
+                                            {timeAgo(date)}
+                                            </Tooltip>
+                                        </div>
+                                    </RealitioHistoryItem>
+                                })
+                            }
+                        </div>
+                    </RealitioHistory>
                 </Column>
 
                 <Column>
@@ -300,7 +397,24 @@ export default function ViewMarket(props: any) {
                         <Heading as="h3" size="md">
                             Trade
                         </Heading>
-
+                        
+                        {/* <UniswapSwapper
+                            tokens={[]} /> */}
+                        {
+                            [
+                                ['SPAM', data.spamPredictionMarket.spamToken], 
+                                ['NOT-SPAM', data.spamPredictionMarket.notSpamToken]
+                            ].map(([ tokenSymbol, tokenAddress ]) => 
+                                <>
+                                    <Link href={generateUniswapTradeLink(tokenAddress, data.spamPredictionMarket.community.token)} isExternal>
+                                        Trade {tokenSymbol} <ExternalLinkIcon mx="2px" />
+                                    </Link>
+                                    <br/>
+                                </>
+                            )
+                        }
+                        
+                        
                         {/* <p>{fromWei(data.user.spamToken_balance)} SPAM</p>
                         <p>{fromWei(data.user.notSpamToken_balance)} NOT-SPAM</p> */}
                     </TokenSwapper>

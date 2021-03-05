@@ -7,6 +7,8 @@ import { AppState } from '../../state';
 //   return useSelector<AppState, AppState['burn']>(state => state.burn)
 // }
 
+import { RedditPostInfo } from './reducer'
+
 export function useRedditState(): AppState['reddit'] {
     return useSelector<AppState, AppState['reddit']>((state) => state.reddit);
 }
@@ -38,7 +40,7 @@ export function useRedditPostAPI(): {
             const body = apiResponse.data.children[0].data;
             const { title, selftext, author, created } = body;
 
-            const response = { title, selftext, author, created };
+            const response: RedditPostInfo = { title, selftext, author, created };
 
             dispatch(loadItem({ itemUrl, response }));
         },

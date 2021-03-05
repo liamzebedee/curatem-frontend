@@ -10,6 +10,7 @@ import { NETWORK_CHAIN_ID } from 'connectors';
 import DynamicTable from '@atlaskit/dynamic-table';
 import { DateTime, Duration } from 'luxon';
 import styled from 'styled-components';
+import { toRelativeTs } from 'utils';
 
 const ViewMarketsWrapper = styled.div`
     display: block;
@@ -24,7 +25,7 @@ const query = gql`
     query GetCommunity($id: ID!) {
         community(id: $id) {
             id
-            moderator
+            moderatorArbitrator
             token
             spamMarkets {
                 id
@@ -38,9 +39,7 @@ const query = gql`
 
 const client = getCuratemApolloClient(NETWORK_CHAIN_ID);
 
-function toRelativeTs(unixTs: number) {
-    return DateTime.fromMillis(unixTs * 1000).toRelative();
-}
+
 
 function buildRows(data: any) {
     const markets = data.community.spamMarkets;

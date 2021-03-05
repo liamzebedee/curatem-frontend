@@ -1,5 +1,7 @@
 import { getAddress } from '@ethersproject/address';
 import { BigNumber, ethers } from 'ethers';
+import { DateTime } from 'luxon';
+import moment from 'moment'
 
 // returns the checksummed address if the address is valid, otherwise returns false
 export function isAddress(value: any): string | false {
@@ -29,4 +31,12 @@ export function fromWei(amount: string) {
 
 export function toPercent(number: string): string {
     return (parseFloat(number) * 100).toFixed(1)
+}
+
+export function toRelativeTs(unixTs: number) {
+    return DateTime.fromMillis(unixTs * 1000).toRelative();
+}
+
+export function timeAgo(date: DateTime) {
+    return moment(date.toMillis()).fromNow();
 }

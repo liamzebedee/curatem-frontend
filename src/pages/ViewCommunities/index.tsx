@@ -70,7 +70,7 @@ const query = gql`
     query GetCommunities {
         communities {
             id
-            moderator
+            moderatorArbitrator
             token
             spamMarkets {
                 id

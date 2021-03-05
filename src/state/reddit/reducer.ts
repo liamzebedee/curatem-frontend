@@ -1,12 +1,15 @@
 import { createReducer } from '@reduxjs/toolkit';
 import { loadItem } from './actions';
 
-export interface RedditAPIObject {
-    [k: string]: any;
+export interface RedditPostInfo {
+    title: string
+    selftext: string
+    author: string
+    created: number
 }
 
 export interface RedditState {
-    [itemUrl: string]: RedditAPIObject;
+    [itemUrl: string]: RedditPostInfo;
 }
 
 const initialState: RedditState = {};
