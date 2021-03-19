@@ -11,6 +11,7 @@ import { save, load } from 'redux-localstorage-simple';
 // import burn from './burn/reducer'
 import reddit from './reddit/reducer';
 import markets from './markets/reducer';
+import balances from './balances/reducer';
 import { reducer as balancerSwapper } from '../components/BalancerSwapper';
 
 const PERSISTED_KEYS: string[] = ['user', 'transactions', 'lists'];
@@ -20,6 +21,7 @@ const store = configureStore({
         reddit,
         markets,
         balancerSwapper,
+        balances,
     },
     middleware: [...getDefaultMiddleware({ thunk: true }), save({ states: PERSISTED_KEYS })],
     preloadedState: load({ states: PERSISTED_KEYS }),

@@ -1,32 +1,22 @@
-import { ChainId, Fetcher, Pair, Token, Route, JSBI, Fraction } from '@uniswap/sdk';
+import { ChainId, Fetcher, Pair, Token as UniswapToken, Route, JSBI, Fraction } from '@uniswap/sdk';
 import { NETWORK_CHAIN_ID } from 'connectors';
 import { ethers } from 'ethers';
 import gql from 'graphql-tag';
 import { getApolloClient, getCuratemApolloClient } from 'utils/getApolloClient';
+import _ from 'lodash'
+
+import {
+    Community,
+    Token,
+    SpamPredictionMarket,
+    SpamPredictionMarketData,
+    MarketData
+} from './types'
+import { useBalanceActions } from 'state/balances/hooks';
 
 const client = getCuratemApolloClient(NETWORK_CHAIN_ID);
 const omenClient = getApolloClient(NETWORK_CHAIN_ID);
 
-export interface MarketData {
-    state?: 'open' | 'resolving' | 'resolved';
-}
-
-export interface Community {
-    id: string
-    moderatorArbitrator: string
-    token: string
-}
-
-export interface SpamPredictionMarketData {
-    spamPredictionMarket: {
-        id: string;
-        questionId: string;
-        itemUrl: string;
-        spamToken: string;
-        notSpamToken: string;
-        community: Community;
-    };
-}
 const marketQuery = gql`
     query GetCuratemMarket($id: ID!) {
         spamPredictionMarket(id: $id) {
@@ -35,10 +25,18 @@ const marketQuery = gql`
             itemUrl
             spamToken
             notSpamToken
+            finalized
+            sharesMinted
+            sharesRedeemed
 
             community {
                 moderatorArbitrator
-                token
+                token {
+                    id
+                    name
+                    symbol
+                    decimals
+                }
                 id
             }
         }
@@ -69,16 +67,6 @@ interface QuestionAnswer {
 interface QuestionData {
     question: Question
 }
-
-
-// id,
-// openingTimestamp
-// timeout
-// currentAnswer
-// currentAnswerTimestamp
-// arbitrator
-// isPendingArbitration
-// answerFinalizedTimestamp,
 
 const questionQuery = gql`
     query GetQuestion($id: ID!) {
@@ -118,7 +106,7 @@ const questionQuery = gql`
 `;
 
 async function loadMarketFromSubgraph(marketId: string) {
-    const queryResult = await client.query<SpamPredictionMarketData>({
+    const queryResult = await client.query<{ spamPredictionMarket: SpamPredictionMarket }>({
         query: marketQuery,
         variables: {
             id: marketId,
@@ -190,15 +178,46 @@ export interface AwaitingAnswer extends RealitioEvent {
     remainingTimer: number
 }
 
+// A question is asked.
+// Anyone may provide an answer with a bond within the question timeframe.
+
+// You post a question to the askQuestion() function, specifiying:
+// The question text and terms. (See "Encoding questions" below.)
+// The timeout, which is how many seconds since the last answer the system will wait before finalizing on it.
+// The arbitrator, which is the address of a contract that will be able to intervene and decide the final answer, in return for a fee.
+// Anyone can post an answer by calling the submitAnswer() function. They must supply a bond with their answer.
+// Supplying an answer sets their answer as the "official" answer, and sets the clock ticking until the timeout elapses and system finalizes on that answer.
+// Anyone can either a different answer or the same answer again. Each time they must supply at least double the previous bond. Each new answer resets the timeout clock.
+// Prior to finalization, anyone can pay an arbitrator contract to make a final judgement. Doing this freezes the system until the arbitrator makes their judgement and sends a submitAnswerByArbitrator() transaction to the contract.
+// Once the timeout from the last answer has elapsed, the system considers it final.
+// Once finalized, anyone can run the claimWinnings() function to distribute the bounty and bonds to each owner's balance, still held in the contract.
+// Users can call withdraw() to take ETH held in their balance out of the contract.
+class EventHistory {
+    events: Array<any> = []
+
+    push(event: any) {
+        this.events = _.sortBy(
+            [
+                ...this.events,
+                event
+            ], 
+            ['time']
+        )
+    }
+
+    get() {
+        return this.events
+    }
+}
+
 async function buildRealitioHistory(questionId: string, question: Question) {
-    let events = []
+    let events = new EventHistory()
     
     const created: CreationEvent = {
         type: 'created',
         time: parseInt(question.openingTimestamp)
     }
     events.push(created)
-
 
     question.answers.forEach(answer => {
         const answerPosted: AnswerPosted = {
@@ -210,7 +229,7 @@ async function buildRealitioHistory(questionId: string, question: Question) {
         events.push(answerPosted)
     })
 
-    if(question.isPendingArbitration) {
+    if(question.arbitrationRequestedBy) {
         const arbitrationRequested: ArbitrationRequested = {
             type: 'arbitration-requested',
             time: parseInt(question.arbitrationRequestedTimestamp),
@@ -220,6 +239,16 @@ async function buildRealitioHistory(questionId: string, question: Question) {
     }
 
     if(question.arbitrationOccurred) {
+        // The answers array will include this arbitrator's answer,
+        // which will be confusing to display as the bond is 0.
+        // So we splice the array at the index of this event.
+        // Bit of a hack.
+        // TODO: this was a bit buggy, after the following events:
+        // 1. Submit one answer
+        // 2. Request arbitration.
+        // let i = _.findLastIndex(events.events, event => event.type == 'answer-posted')
+        // events.events.splice(i)
+
         const arbitrationAnswer: ArbitrationAnswer = {
             type: 'arbitration-answer',
             time: parseInt(question.answerFinalizedTimestamp),
@@ -233,25 +262,13 @@ async function buildRealitioHistory(questionId: string, question: Question) {
             answer: question.currentAnswer
         }
         events.push(finalised)
-    }
-
-    if(
-        question.currentAnswerTimestamp &&
-        !question.isPendingArbitration  
-    ) {
+    } else if (question.currentAnswerTimestamp) {
         const nowInSeconds = Math.floor(+new Date() / 1000);
         const currentAnswerTimestamp = parseInt(question.currentAnswerTimestamp)
         const timeout = parseInt(question.timeout)
 
         let remainingTimer = (currentAnswerTimestamp + timeout) - nowInSeconds
-        if(remainingTimer < 0) {
-            const finalised: Finalised = {
-                type: 'finalised',
-                time: currentAnswerTimestamp + timeout,
-                answer: question.currentAnswer
-            }
-            events.push(finalised)
-        } else {
+        if(remainingTimer > 0) {
             // Still waiting answer. Show timeout.
             // TODO
             const ev: AwaitingAnswer = {
@@ -260,32 +277,18 @@ async function buildRealitioHistory(questionId: string, question: Question) {
                 remainingTimer
             }
             events.push(ev)
+        } else {
+            const finalised: Finalised = {
+                type: 'finalised',
+                time: currentAnswerTimestamp + timeout,
+                answer: question.currentAnswer
+            }
+            events.push(finalised)
         }
     }
 
-    return events.reverse()
+    return events.get().reverse()
 }
-
-// class RealitioUtils {
-//     static determineStatus(question) {
-//         // A question is asked.
-//         // Anyone may provide an answer with a bond within the question timeframe.
-
-//         // You post a question to the askQuestion() function, specifiying:
-//         // The question text and terms. (See "Encoding questions" below.)
-//         // The timeout, which is how many seconds since the last answer the system will wait before finalizing on it.
-//         // The arbitrator, which is the address of a contract that will be able to intervene and decide the final answer, in return for a fee.
-//         // Anyone can post an answer by calling the submitAnswer() function. They must supply a bond with their answer.
-//         // Supplying an answer sets their answer as the "official" answer, and sets the clock ticking until the timeout elapses and system finalizes on that answer.
-//         // Anyone can either a different answer or the same answer again. Each time they must supply at least double the previous bond. Each new answer resets the timeout clock.
-//         // Prior to finalization, anyone can pay an arbitrator contract to make a final judgement. Doing this freezes the system until the arbitrator makes their judgement and sends a submitAnswerByArbitrator() transaction to the contract.
-//         // Once the timeout from the last answer has elapsed, the system considers it final.
-//         // Once finalized, anyone can run the claimWinnings() function to distribute the bounty and bonds to each owner's balance, still held in the contract.
-//         // Users can call withdraw() to take ETH held in their balance out of the contract.
-
-//     }
-// }
-
 
 
 
@@ -332,14 +335,14 @@ export async function loadMarket(account: any, library: any, marketId: string) {
         marketData.state = 'open';
     }
 
-    let uniSpamToken = new Token(ChainId.KOVAN, spamToken.address, 18, "SPAM")
-    let uniNotSpamToken = new Token(ChainId.KOVAN, notSpamToken.address, 18, "NOT-SPAM")
-    let uniCollateralToken = new Token(ChainId.KOVAN, data.community.token, 18, "REP")
+    let uniSpamToken = new UniswapToken(ChainId.KOVAN, spamToken.address, 18, "SPAM")
+    let uniNotSpamToken = new UniswapToken(ChainId.KOVAN, notSpamToken.address, 18, "NOT-SPAM")
+    let uniCollateralToken = new UniswapToken(ChainId.KOVAN, data.community.token.id, 18, "REP")
 
     const pairSpamCollateral = await Fetcher.fetchPairData(uniSpamToken, uniCollateralToken, library)
     const pairNotSpamCollateral = await Fetcher.fetchPairData(uniNotSpamToken, uniCollateralToken, library)
     
-    function getUniswapPoolInfo(pair: Pair, token: Token) {
+    function getUniswapPoolInfo(pair: Pair, token: UniswapToken) {
         console.debug(`Getting info for ${pair.token0.symbol}/${pair.token1.symbol} pool`)
         console.debug(`Reserves: ${pair.reserve0.toFixed(5)} ${pair.token0.symbol}, ${pair.reserve1.toFixed(5)} ${pair.token1.symbol}`)
         if(pair.reserveOf(token).equalTo(JSBI.BigInt(0))) {
@@ -400,6 +403,16 @@ export async function loadMarket(account: any, library: any, marketId: string) {
     console.debug(odds)
 
     return {
+        tokens: {
+            outcomes: {
+                notSpamToken: notSpamToken.address,
+                spamToken: spamToken.address
+            },
+            lpshares: {
+                spam: pairSpamCollateral.liquidityToken.address,
+                notSpam: pairNotSpamCollateral.liquidityToken.address
+            }
+        },
         user: {
             spamToken_balance,
             notSpamToken_balance,

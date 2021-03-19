@@ -12,10 +12,6 @@ import store from './state';
 import getLibrary from './utils/getLibrary';
 import "intl-relative-time-format";
 
-if (!process.env.REACT_APP_GNOSIS_GRAPHQL_ENDPOINT) {
-    throw new Error('REACT_APP_GNOSIS_GRAPHQL_ENDPOINT environment variable not defined');
-}
-
 const Web3ProviderNetwork = createWeb3ReactRoot(NetworkContextName);
 
 if ('ethereum' in window) {

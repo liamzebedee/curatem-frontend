@@ -1,3 +1,8 @@
+export const contracts = [
+    'RedditCommunity1', 'WETH9', 'Scripts', 'UniswapV2Router02',
+    'ModeratorArbitratorV1', 'ModeratorArbitrator',
+    'CuratemHelpersV1', 'RealitioOracle'
+];
 export interface Deployments {
     [networkId: string]: ContractDeployments;
 }
@@ -15,7 +20,7 @@ export interface ContractResolver {
     resolve(contract: string): ContractDeployment;
 }
 
-export async function resolveContracts(networkId: string, contracts: string[]): Promise<ContractDeployments> {
+export async function resolveContracts(networkId: string): Promise<ContractDeployments> {
     /* eslint-disable @typescript-eslint/no-var-requires */
     const deployments = require('@curatem/contracts/deployments.json');
     console.log(`Resolving contracts from deployments`, deployments, `on network ${networkId}`);

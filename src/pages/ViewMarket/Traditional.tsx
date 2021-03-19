@@ -1,22 +1,24 @@
-import { Button, Heading, Progress, Select, Link, Tooltip } from '@chakra-ui/react';
+import { Button, Heading, Progress, Select, Link, Tooltip, Icon } from '@chakra-ui/react';
 import { RouteComponentProps } from '@reach/router';
 import { CurrencyAmount, TokenAmount } from '@uniswap/sdk';
 import { useWeb3React } from '@web3-react/core';
 import { AnswerPosted, ArbitrationAnswer, ArbitrationRequested, AwaitingAnswer, CreationEvent, Finalised, loadMarket } from 'data/market';
 import { BigNumber, ethers } from 'ethers';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useQuery as useReactQuery } from 'react-query';
 import { useRedditPostAPI, useRedditState } from 'state/reddit/hooks';
 import styled from 'styled-components';
 import { fromWei, shortenAddress, timeAgo, toPercent, toRelativeTs, toWei } from 'utils';
 import { getSigner } from 'utils/getLibrary';
-import { generateEtherscanLink, generateRealityEthLink, generateUniswapTradeLink } from 'utils/links';
+import { generateEtherscanLink, generateEtherscanTokenLink, generateRealityEthLink, generateUniswapTradeLink } from 'utils/links';
 import { useContractDeployments } from '../../hooks/useContractDeployments';
 import { UniswapSwapper } from '../../components/UniswapSwapper'
-import { ExternalLinkIcon } from '@chakra-ui/icons';
+import { ExternalLinkIcon, LockIcon } from '@chakra-ui/icons';
 import { Question } from 'utils/types';
 import { DateTime } from 'luxon';
+import { resolveContracts } from 'utils/resolver';
+import { useBalanceActions, useBalances } from 'state/balances/hooks';
 
 interface ViewMarketProps extends RouteComponentProps {
     market?: string;
@@ -27,6 +29,7 @@ const Row = styled.div`
     flex-direction: row;
     > * {
         margin-right: 1rem;
+        margin-left: 1rem;
     }
     margin-bottom: 1rem;
 `;
@@ -45,7 +48,7 @@ const PostContent = styled.div`
 
     border: 1px solid #ddd;
     padding: 1em;
-    width: 1000px;
+    max-width: 1000px;
 `;
 
 const PostContentPreview = styled.div`
@@ -64,12 +67,12 @@ const PostContentPreview = styled.div`
 
 const YourBet = styled.div`
     display: block;
-    flex: 0 0;
+    flex: 0 1;
     align-self: start;
 
     border: 1px solid #ddd;
     padding: 1em;
-    width: 400px;
+    width: 350px;
 
     > * {
         margin-bottom: 0.5rem;
@@ -80,8 +83,11 @@ const MarketOverview = styled.div`
     display: block;
     border: 1px solid #ddd;
     padding: 1em;
-    width: 1000px;
+    max-width: 1000px;
     justify-self: left;
+    > div {
+        margin-top: .5rem;
+    }
 
     table {
         width: 100%;
@@ -102,7 +108,7 @@ const RealitioHistory = styled.div`
     display: block;
     border: 1px solid #ddd;
     padding: 1em;
-    width: 1000px;
+    max-width: 1000px;
     justify-self: left;
     > div {
         margin-top: 1rem;
@@ -122,12 +128,13 @@ const MarketTableRow = styled.div`
 
 const TokenSwapper = styled.div`
     display: block;
-    flex: 1 0;
+    flex: 0 0;
     align-self: start;
 
     border: 1px solid #ddd;
     padding: 1em;
-    width: 400px;
+    max-width: 400px;
+    width: 100%;
 
     iframe {
 
@@ -159,7 +166,14 @@ const MarketStateIcon = ({ state }: { state: string }) => {
     return <>{state.toUpperCase()}</>;
 };
 
+const REALITIO_ANSWER_INVALID = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
 function getOutcomeFromIndex(question: Question, index: string) {
+    if(index == REALITIO_ANSWER_INVALID) {
+        return "Invalid"
+    }
+    if(index == null) {
+        return null
+    }
     return question.outcomes[BigNumber.from(index).toNumber()]
 }
 
@@ -205,6 +219,7 @@ export default function ViewMarket(props: any) {
     );
 
     const { fetchPost } = useRedditPostAPI();
+    const balances = useBalances()
     useEffect(() => {
         if (data && data.spamPredictionMarket) {
             fetchPost(data.spamPredictionMarket.itemUrl);
@@ -285,7 +300,7 @@ export default function ViewMarket(props: any) {
                                 
                                 <li>
                                     <strong>Arbitrator</strong>: Community Moderators (
-                                        <Link href={generateEtherscanLink('address', data.spamPredictionMarket.community.moderatorArbitrator)}>
+                                        <Link href={generateEtherscanLink('address', data.spamPredictionMarket.community.moderatorArbitrator, chainId!)}>
                                             { shortenAddress(data.spamPredictionMarket.community.moderatorArbitrator) } <ExternalLinkIcon mx="2px" />
                                         </Link>)
                                 </li>
@@ -293,15 +308,18 @@ export default function ViewMarket(props: any) {
                         </div>
 
                         <br/>
-
+                        
                         <div style={{ margin: '0 -1rem' }}>
                             <table>
                                 <thead>
-                                    <th>Outcome/probability</th>
-                                    <th>Liquidity</th>
-                                    {/* <th>Volume</th> */}
-                                    <th>My shares</th>
-                                    <th>My LP shares</th>
+                                    <tr>
+                                        <th>Outcome/probability</th>
+                                        <th>Liquidity</th>
+                                        {/* <th>Volume</th> */}
+                                        <th>My shares</th>
+                                        <th>My LP shares</th>
+                                        <th></th>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                     {
@@ -312,7 +330,8 @@ export default function ViewMarket(props: any) {
                                                 odds: toPercent(data.amm.prices.spam),
                                                 reserves: data.amm.reserves.spam,
                                                 myShares: CurrencyAmount.ether(data.user.spamToken_balance),
-                                                myLPShares: CurrencyAmount.ether(data.amm.lpshares.spam)
+                                                myLPShares: CurrencyAmount.ether(data.amm.lpshares.spam),
+                                                tokenAddress: data.spamPredictionMarket.spamToken
                                             },
                                             {
                                                 outcomeName: "Not Spam",
@@ -320,12 +339,15 @@ export default function ViewMarket(props: any) {
                                                 odds: toPercent(data.amm.prices.notspam),
                                                 reserves: data.amm.reserves.notspam,
                                                 myShares: CurrencyAmount.ether(data.user.notSpamToken_balance),
-                                                myLPShares: CurrencyAmount.ether(data.amm.lpshares.notspam)
+                                                myLPShares: CurrencyAmount.ether(data.amm.lpshares.notspam),
+                                                tokenAddress: data.spamPredictionMarket.notSpamToken
                                             }
-                                        ].map(({ outcomeName, outcomeTokenSymbol, odds, reserves, myShares, myLPShares }) => <tr>
-                                            <td width={400}>
+                                        ].map(({ outcomeName, outcomeTokenSymbol, odds, reserves, myShares, myLPShares, tokenAddress }) => <tr>
+                                            <td width={'400'}>
                                                 <MarketTableRow>
-                                                    <header style={{ flex: 1 }} className="outcome">{ outcomeName }</header>
+                                                    <header style={{ flex: 1 }} className="outcome">
+                                                    { outcomeName }
+                                                    </header>
                                                     <span className="odds">{ odds }%</span>
                                                 </MarketTableRow>
         
@@ -336,15 +358,21 @@ export default function ViewMarket(props: any) {
                                                 </MarketTableRow>
                                             </td>
                                             
-                                            <td width={100}>
+                                            <td width={125}>
                                                 {reserves}
                                             </td>
         
-                                            <td width={125}>
-                                                <p>{myShares.toFixed(6)}</p>
+                                            <td width={175}>
+                                                <p>
+                                                    <Link href={generateEtherscanTokenLink(tokenAddress, account!, chainId!)} isExternal>
+                                                        {
+                                                            balances.tokens[tokenAddress] && CurrencyAmount.ether(balances.tokens[tokenAddress][account!].toString()).toFixed(6)
+                                                        } <ExternalLinkIcon mx="2px" />
+                                                    </Link>
+                                                </p>
                                             </td>
 
-                                            <td width={125}>
+                                            <td width={175}>
                                                 <p>{myLPShares.toFixed(6)}</p>
                                             </td>
                                         </tr>)
@@ -387,19 +415,19 @@ export default function ViewMarket(props: any) {
                             Your bet
                         </Heading>
                         
-                        <SpamSelector 
-                            balances={[data.user.notSpamToken_balance, data.user.spamToken_balance]}
+                        { !loading && <SpamSelector
+                            tokens={data.tokens} 
                             {...data.spamPredictionMarket} 
-                            market={data.spamPredictionMarket.id} />
+                            market={data.spamPredictionMarket.id} /> }
                     </YourBet>
-
+                    
+                    <OutcomePanel data={data}/>
+                    
                     <TokenSwapper>
                         <Heading as="h3" size="md">
                             Trade
                         </Heading>
                         
-                        {/* <UniswapSwapper
-                            tokens={[]} /> */}
                         {
                             [
                                 ['SPAM', data.spamPredictionMarket.spamToken], 
@@ -413,17 +441,236 @@ export default function ViewMarket(props: any) {
                                 </>
                             )
                         }
-                        
-                        
-                        {/* <p>{fromWei(data.user.spamToken_balance)} SPAM</p>
-                        <p>{fromWei(data.user.notSpamToken_balance)} NOT-SPAM</p> */}
                     </TokenSwapper>
+
+                    <YourBet>
+                        <Heading as="h3" size="md">
+                            Moderate
+                        </Heading>
+                        
+                        <ArbitratePane
+                            data={data} />
+                    </YourBet>
                 </Column>
+
+                
             </Row>
 
             <Row></Row>
         </>
     );
+}
+
+const OutcomePanel = (props: any) => {
+    const { data: { spamPredictionMarket: market, question } } = props
+    const { account, library, chainId } = useWeb3React();
+
+    const [state, setState] = useState<Record<string, any>>({
+        canRedeem: true,
+        needsFinalisation: props.data.market.state == 'resolved' && !market.finalized,
+        error: null,
+        loading: false
+    })
+
+
+    const finalize = useCallback(async function finalize() {
+        setState({
+            ...state,
+            loading: true,
+            error: ''
+        })
+
+        const deployments = await resolveContracts(`${chainId}`)
+
+        const signer = getSigner(library, account!);
+        const realitioOracle = new ethers.Contract(
+            deployments['RealitioOracle'].address,
+            require('@curatem/contracts/abis/RealitioOracle.json'),
+            signer,
+        )
+
+        try {
+            // TODO: sanity check market.oracle == realitioOracle
+            //       for future implementations.
+            const res = await realitioOracle.resolve(question.id, market.id)
+            await res.wait(1)
+        } catch(ex) {
+            if(ex.code == 4001) {
+                setState({
+                    ...state,
+                    loading: false,
+                    error: ''
+                })
+                return
+            }
+            setState({
+                ...state,
+                loading: false,
+                error: ex.toString()
+            })
+        }
+
+        setState({
+            ...state,
+            loading: false,
+            error: null,
+            needsFinalisation: false
+        })
+        return
+
+    }, [library, account, chainId, props.data])
+
+
+    // const load = useCallback(async function load() {
+    //     const deployments = await resolveContracts(`${chainId}`)
+    //     const signer = getSigner(library, account!);
+
+    //     const marketContract = new ethers.Contract(
+    //         market.id,
+    //         require('@curatem/contracts/abis/SpamPredictionMarket.json'),
+    //         library,
+    //     );
+
+    //     const curatemHelpers = new ethers.Contract(
+    //         deployments['CuratemHelpersV1'].address,
+    //         require('@curatem/contracts/abis/CuratemHelpersV1.json'),
+    //         library,
+    //     );
+        
+    //     const canRedeem = await curatemHelpers.canRedeem(market.id, account)
+    //     setState({
+    //         ...state,
+    //         canRedeem,
+    //     })
+    // }, [library, account, chainId, props.data])
+
+    const redeem = useCallback(async function redeem() {
+        setState({
+            ...state,
+            loading: true,
+            error: ''
+        })
+
+        const signer = getSigner(library, account!);
+
+        const marketContract = new ethers.Contract(
+            market.id,
+            require('@curatem/contracts/abis/SpamPredictionMarket.json'),
+            signer,
+        );
+        
+        const spamToken = new ethers.Contract(
+            market.spamToken,
+            require('@curatem/contracts/abis/ERC20.json'),
+            signer,
+        );
+
+        const notSpamToken = new ethers.Contract(
+            market.notSpamToken,
+            require('@curatem/contracts/abis/ERC20.json'),
+            signer,
+        );
+
+        
+
+        try {
+            const payouts: BigNumber[] = await marketContract.callStatic.getPayouts()
+            let tokens = [notSpamToken, spamToken]
+            let i = 0
+
+            for(let payout of payouts) {
+                if(payout.gt(BigNumber.from(0))) {
+                    let [balance, allowance, error] = await checkBalanceAndAllow(
+                        tokens[i], 
+                        BigNumber.from('1'), 
+                        account!, 
+                        marketContract.address
+                    )
+                    if(error) throw error
+
+                    const res = await marketContract.redeemOutcome(i, balance)
+                    await res.wait(1)
+                }
+            }
+
+        } catch(ex) {
+            if(ex.code == 4001) {
+                setState({
+                    ...state,
+                    loading: false,
+                    error: ''
+                })
+            } else {
+                setState({
+                    ...state,
+                    loading: false,
+                    error: ex.toString()
+                })
+                console.error(ex)
+            }
+            return
+        }
+
+        setState({
+            ...state,
+            loading: false,
+            error: null,
+            needsFinalisation: false,
+            canRedeem: false
+        })
+        return
+
+    }, [library, account, chainId, props.data, market])
+
+
+    // useEffect(() => {
+    //     if(props.data.market.state == 'resolved' && !state.needsFinalisation) { 
+    //         load()
+    //     }
+    // }, [library, account, chainId, state.needsFinalisation])
+
+    let action
+    
+    if(props.data.market.state == 'resolving') {
+
+    } else if(state.needsFinalisation) {
+        action = <Button disabled={state.loading} onClick={finalize}>
+            Finalise
+        </Button>   
+    } else {
+        action = state.canRedeem == null ?
+            'Loading balances...' :
+          <Button 
+              disabled={!state.canRedeem || state.loading!}
+              onClick={redeem}>
+              Redeem
+          </Button>
+    }
+
+    function getResolvingAnswerText() {
+        if(question.currentAnswer != null) {
+            return <>The current answer is <strong>{getOutcomeFromIndex(question, question.currentAnswer)}</strong>.</>
+        }
+        return <>Awaiting an answer from reality.eth.</>
+    }
+
+    return <YourBet>
+        <Heading as="h3" size="md">
+            Outcome
+        </Heading>
+
+        <p>
+            {
+                props.data.market.state == 'resolving' 
+                ? getResolvingAnswerText()
+                : <>The final answer was <strong>{getOutcomeFromIndex(question, question.currentAnswer)}</strong>.</>
+            }
+        </p>
+        
+        {action}
+
+        {state.error && state.error.toString()}
+    </YourBet>
 }
 
 async function checkBalanceAndAllow(
@@ -434,34 +681,61 @@ async function checkBalanceAndAllow(
 ) {
     let balance = ethers.constants.Zero;
     let allowance = ethers.constants.Zero;
-    let error;
+    let error = null;
 
-    balance = await token.balanceOf(holder);
-    if (balance.lt(amount)) {
-        error = new Error(`Token balance is too low. Balance: ${balance.toString()}, minimum buy: 1,000,000`);
-        return [balance, allowance, error];
-    }
+    try {
 
-    allowance = await token.allowance(holder, spender);
-    if (allowance.lt(amount)) {
-        await token.approve(spender, ethers.constants.MaxUint256, { from: holder });
+        balance = await token.balanceOf(holder);
+        if (balance.lt(amount)) {
+            error = new Error(`Token balance is too low. Balance: ${balance.toString()}`);
+            return [balance, allowance, error];
+        }
+
+        allowance = await token.allowance(holder, spender);
+        if (allowance.lt(amount)) {
+            const res = await token.approve(spender, ethers.constants.MaxUint256, { from: holder });
+            await res.wait(1)
+        }
+    } catch(ex) {
+        return [balance, allowance, ex]
     }
 
     return [balance, allowance, null];
 }
 
+
 const outcomes = ['Not Spam', 'Spam']
+const SELECT_OPTION_NONE = ''
 const SpamSelector = (props: any) => {
     const { account, library } = useWeb3React();
     const { deployments } = useContractDeployments();
+    const balances = useBalances()
+
+    const { tokens } = props
 
     const [state, setState] = useState({
         loading: false,
         error: ''
     })
 
+    const [balancesLoaded, setBalancesLoaded] = useState(false)
+    const { loadBalances } = useBalanceActions()
+    useEffect(() => {
+        Promise.all([
+            loadBalances(tokens.outcomes.spamToken, account!),
+            loadBalances(tokens.outcomes.notSpamToken, account!)
+        ]).then(() => {
+            setBalancesLoaded(true)
+        })
+    }, [account])
+
     async function onSelect(ev: any) {
         const { value } = ev.target;
+        setState({
+            loading: false,
+            error: '',
+        })
+        if(value == SELECT_OPTION_NONE) return
         purchase(value);
     }
 
@@ -471,9 +745,8 @@ const SpamSelector = (props: any) => {
             error: ''
         })
 
-        const outcomes = ['notspam', 'spam'];
         const signer = getSigner(library, account!);
-        const buyAmount = toWei('1');
+        const buyAmount = toWei('0.1');
 
         const market = new ethers.Contract(
             props.market,
@@ -491,7 +764,7 @@ const SpamSelector = (props: any) => {
             library,
         );
         const collateralToken = new ethers.Contract(
-            props.community.token,
+            props.community.token.id,
             require('@curatem/contracts/abis/ERC20.json'),
             signer,
         );
@@ -539,10 +812,13 @@ const SpamSelector = (props: any) => {
                 return 
             }
 
+            console.error(ex)
+
             setState({
                 loading: false,
                 error: ex.toString()
             })
+            return
         }
 
         setState({
@@ -551,22 +827,28 @@ const SpamSelector = (props: any) => {
         })
     }
 
-    const lastKnownBet = useMemo(function computeLastKnownBet() {
-        const balances = props.balances
 
+    const lastKnownBet = useMemo(function computeLastKnownBet() {
         let defaultSelection = undefined
+        if(!balancesLoaded) return defaultSelection
+
+        const outcomeBalances = [
+            balances.tokens[tokens.outcomes.notSpamToken][account!],
+            balances.tokens[tokens.outcomes.spamToken][account!]
+        ]
+        
         let largestIdx = 0
-        for(let i = 0; i < balances.length; i++) {
-            if(balances[i].gt(balances[largestIdx])) 
+        for(let i = 0; i < outcomeBalances.length; i++) {
+            if(outcomeBalances[i].gt(outcomeBalances[largestIdx])) 
                 largestIdx = i
         }
         
         // If the largest balance is 0, then default selection remains as undefined.
-        if(!balances[largestIdx].eq(ethers.constants.Zero)) {
+        if(!outcomeBalances[largestIdx].eq(ethers.constants.Zero)) {
             defaultSelection = largestIdx
         }
         return defaultSelection
-    }, props.balances)
+    }, [props.tokens, balances, balancesLoaded])
 
     return (
         <>
@@ -584,3 +866,141 @@ const SpamSelector = (props: any) => {
         </>
     );
 };
+
+const ArbitratePane = (props: any) => {
+    const { spamPredictionMarket: market, question } = props.data
+
+    const { account, library } = useWeb3React();
+    const { deployments, loaded: deploymentsLoaded } = useContractDeployments();
+
+    const { data, isLoading: loading, isIdle, error } = useReactQuery<any, Error>(
+        ['load-arbitrator-info', market.id],
+        () => load(account, library, market.id),
+        { 
+            retry: 1,
+            // TODO: deployments don't need to be a part of component state.
+            // they can easily be loaded using a promise inside of the react-query's.
+            enabled: deploymentsLoaded
+        },
+    );
+
+    async function load(account: any, library: any, marketId: string) {
+        const moderatorArbitrator = new ethers.Contract(
+            market.community.moderatorArbitrator,
+            require('@curatem/contracts/abis/ModeratorArbitratorV1.json'),
+            library,
+        )
+        const moderator = await moderatorArbitrator.moderator()
+        return {
+            moderator
+        }
+    }
+
+    if(loading || isIdle) 
+        return <>Loading...</>
+    
+    if(error)
+        return <>
+            {error.toString()}
+        </>
+    
+    if(data.moderator !== account) {
+        return <>
+            <LockIcon/> Moderator tools only available to {data.moderator}.
+        </>
+    }
+
+    if(!question.isPendingArbitration) {
+        return <>Question is not pending arbitration.</>
+    }
+
+    return <>
+        <ModeratorSubmitFinalAnswer data={props.data}/>
+    </>
+}
+
+
+const ModeratorSubmitFinalAnswer = (props: any) => {
+    const { data } = props
+    const { spamPredictionMarket: market } = data
+    const [answer, setAnswer] = useState(null)
+    const [state, setState] = useState({
+        loading: false,
+        error: ''
+    })
+
+    const { account, library, chainId } = useWeb3React();
+    
+    async function onSelect(ev: any) {
+        const { value } = ev.target;
+        setState({
+            loading: false,
+            error: '',
+        })
+        if(value == SELECT_OPTION_NONE) return
+        setAnswer(value)
+    }
+
+    const submitAnswer = useCallback(async function submitAnswer(outcome: number) {
+        setState({
+            loading: true,
+            error: ''
+        })
+        // const deployments = await resolveContracts(`${chainId}`);
+        const signer = getSigner(library, account!);
+
+        const moderatorArbitrator = new ethers.Contract(
+            market.community.moderatorArbitrator,
+            require('@curatem/contracts/abis/ModeratorArbitratorV1.json'),
+            signer,
+        )
+
+
+        try {
+            const res = await moderatorArbitrator.submitAnswer(
+                market.questionId, 
+                ethers.utils.zeroPad(ethers.BigNumber.from(outcome).toHexString(), 32)
+            )
+
+            await res.wait(1)
+        } catch(ex) {
+            // Tx refused.
+            // TODO: hacky way to handle transactions.
+            if(ex.code == 4001) {
+                setState({
+                    loading: false,
+                    error: ''
+                })
+                return 
+            }
+
+            setState({
+                loading: false,
+                error: ex.toString()
+            })
+            return
+        }
+
+        setState({
+            loading: false,
+            error: ''
+        })
+    }, [account, chainId, library, data, market])
+
+    return <>
+        <Select 
+            placeholder="None" 
+            onChange={onSelect}>
+                {outcomes.map((outcome, idx) => {
+                    return <option key={idx} value={idx}>{outcome}</option>
+                })}
+        </Select>
+        <Button 
+            disabled={state.loading || !answer} 
+            onClick={() => submitAnswer(answer!)}>
+            Submit final answer
+        </Button>
+
+        {state.error && state.error.toString()}
+    </>
+}

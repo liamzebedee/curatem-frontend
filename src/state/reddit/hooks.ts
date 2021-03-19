@@ -21,12 +21,19 @@ export function useRedditPostAPI(): {
     const fetchPost = useCallback(
         async (itemUrl: string) => {
             // TODO: validate URL.
+            let url
 
-            const url = new URL(itemUrl); // https://www.reddit.com/r/ethereum/comments/hbjx25/the_great_reddit_scaling_bakeoff/1612834360869
+            try {
+                url = new URL(itemUrl); // https://www.reddit.com/r/ethereum/comments/hbjx25/the_great_reddit_scaling_bakeoff/1612834360869
+            } catch(ex) {
+                // Do nothing.
+                return
+            }
+
             const REDDIT_URL_REGEX = /r\/([a-zA-Z0-9]+)\/comments\/([a-zA-Z0-9]+)\//;
             const matches = url.pathname.match(REDDIT_URL_REGEX);
             if (!matches || matches.length != 3) {
-                throw new Error('incorrect number of matches');
+                throw new Error("Couldn't parse Reddit URL");
             }
             const id = matches[2];
 

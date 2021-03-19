@@ -2,9 +2,7 @@ import { resolveContracts } from '../utils/contracts';
 import { useActiveWeb3React } from '.';
 import { useEffect, useState } from 'react';
 import { Web3Provider } from '@ethersproject/providers';
-import { ContractDeployments } from 'utils/resolver';
-
-export const contracts = ['RedditCommunity1', 'WETH9', 'Scripts', 'UniswapV2Router02'];
+import { ContractDeployments, contracts } from 'utils/resolver';
 
 export function useContractDeployments() {
     const { active, library, chainId } = useActiveWeb3React();
@@ -14,7 +12,7 @@ export function useContractDeployments() {
     });
 
     async function load() {
-        const deployments = await resolveContracts(`${chainId}`, contracts);
+        const deployments = await resolveContracts(`${chainId}`);
         console.log(`Loaded deployments`, deployments);
         setState({
             deployments,

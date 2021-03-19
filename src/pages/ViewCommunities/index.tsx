@@ -8,6 +8,7 @@ import { Link, RouteComponentProps } from 'react-router-dom';
 import { getCuratemApolloClient } from 'utils/getApolloClient';
 import { useContractDeployments } from '../../hooks/useContractDeployments';
 import styled from 'styled-components';
+import { Community } from 'data/types';
 
 const ViewCommunitiesWrapper = styled.div`
     display: block;
@@ -20,10 +21,7 @@ const head = {
             content: 'Name',
         },
         {
-            content: 'Your rep',
-        },
-        {
-            content: 'Your curation earnings',
+            content: 'Token',
         },
         {
             content: '',
@@ -33,7 +31,7 @@ const head = {
 
 function buildRows(data: any) {
     const { communities } = data;
-    return communities.map((community: any) => {
+    return communities.map((community: Community) => {
         return {
             cells: [
                 {
@@ -42,22 +40,15 @@ function buildRows(data: any) {
                 },
                 {
                     // TODO:
-                    content: '?',
-                },
-                {
-                    // TODO:
-                    content: '?',
+                    content: community.token.symbol,
                 },
                 {
                     // TODO:
                     content: (
                         <>
-                            {/* <LinkOverlay href={`/#/communities/${community.id}/markets`}> */}
                             <Link to={`/communities/${community.id}/markets`}>
                                 <Button size="md">{community.spamMarkets.length} Markets</Button>
                             </Link>
-                            {/* </LinkOverlay> */}
-                            {/* <Link to={`/communities/${community.id}/markets`}>{community.spamMarkets.length} Markets</Link> */}
                         </>
                     ),
                 },
@@ -71,7 +62,12 @@ const query = gql`
         communities {
             id
             moderatorArbitrator
-            token
+            token {
+                id
+                name
+                symbol
+                decimals
+            }
             spamMarkets {
                 id
             }
@@ -82,9 +78,9 @@ const query = gql`
 const client = getCuratemApolloClient(NETWORK_CHAIN_ID);
 
 export default function ViewCommunities(props: RouteComponentProps & any) {
-    const { data, error, loading, refetch } = useQuery(query, {
+    const { data, error, loading, refetch } = useQuery<{ communities: Community[] }>(query, {
         client,
-    });
+    })
 
     const rows = useMemo(() => (data ? buildRows(data) : []), [data]);
 
@@ -92,7 +88,7 @@ export default function ViewCommunities(props: RouteComponentProps & any) {
 
     if (error) return <>{error.toString()}</>;
 
-    if (data.communities === null) {
+    if (data!.communities === null) {
         throw new Error('Unexpected error - subgraph could not load communities.');
     }
 
@@ -101,7 +97,7 @@ export default function ViewCommunities(props: RouteComponentProps & any) {
             <Heading as="h1" size="lg">
                 Communities
             </Heading>
-            {data.communities.length} communities
+            {data!.communities.length} communities
             <DynamicTable
                 head={head}
                 rows={rows}

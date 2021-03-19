@@ -1,16 +1,17 @@
 import { useGraphMarketMakerData } from 'hooks/useGraphMarketData';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { RouteComponentProps } from '@reach/router';
 import { getCuratemApolloClient } from 'utils/getApolloClient';
 import gql from 'graphql-tag';
 import { useQuery } from '@apollo/client';
 import { Link } from 'react-router-dom';
-import { Button, Heading } from '@chakra-ui/react';
+import { Button, Heading, Input } from '@chakra-ui/react';
 import { NETWORK_CHAIN_ID } from 'connectors';
 import DynamicTable from '@atlaskit/dynamic-table';
 import { DateTime, Duration } from 'luxon';
 import styled from 'styled-components';
 import { toRelativeTs } from 'utils';
+import { CurrencyAmount } from '@uniswap/sdk';
 
 const ViewMarketsWrapper = styled.div`
     display: block;
@@ -32,6 +33,8 @@ const query = gql`
                 questionId
                 itemUrl
                 createdAt
+                sharesMinted
+                sharesRedeemed
             }
         }
     }
@@ -56,13 +59,10 @@ function buildRows(data: any) {
                     ),
                 },
                 {
-                    content: '',
+                    content: toRelativeTs(market.creatsedAt),
                 },
                 {
-                    content: toRelativeTs(market.createdAt),
-                },
-                {
-                    content: '',
+                    content: <>{ CurrencyAmount.ether(market.sharesMinted).toFixed(6) }</>,
                 },
             ].map((cell, j) => {
                 return {
@@ -88,7 +88,7 @@ export default function ViewMarkets(props: any) {
         client,
     });
 
-    const rows = useMemo(() => (data ? buildRows(data) : []), [data]);
+    const rows = useMemo(() => (data && data.community ? buildRows(data) : []), [data]);
 
     if (loading) return null;
 
@@ -98,6 +98,8 @@ export default function ViewMarkets(props: any) {
         return <>No community found.</>;
     }
 
+    
+
     const head = {
         cells: [
             {
@@ -106,22 +108,18 @@ export default function ViewMarkets(props: any) {
                 isSortable: false,
             },
             {
-                key: 'Author',
-                content: 'Author',
-                isSortable: false,
-            },
-            {
                 key: 'Created',
                 content: 'Created',
                 isSortable: false,
             },
             {
-                key: 'Volume',
-                content: 'Volume',
+                key: 'Total shares minted',
+                content: 'Total shares minted',
                 isSortable: false,
             },
         ],
     };
+
 
     return (
         <ViewMarketsWrapper>
@@ -132,8 +130,11 @@ export default function ViewMarkets(props: any) {
 
                 <ActionRow>
                     <span>{data.community.spamMarkets.length} markets</span>
-                    {/* <Button>Search by URL</Button> */}
                 </ActionRow>
+                {/* <ActionRow>
+                    <Input placeholder="Enter a Reddit post URL" />
+                    <Button>Go to market</Button>
+                </ActionRow> */}
 
                 <DynamicTable
                     head={head}
