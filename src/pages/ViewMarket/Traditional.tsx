@@ -244,7 +244,6 @@ export default function ViewMarket(props: any) {
     ];
 
     
-
     return (
         <>
             <Row>
@@ -620,7 +619,7 @@ const OutcomePanel = (props: any) => {
         })
         return
 
-    }, [library, account, chainId, props.data, market])
+    }, [state, library, account, chainId, props.data, market])
 
 
     // useEffect(() => {
@@ -727,7 +726,7 @@ const SpamSelector = (props: any) => {
         ]).then(() => {
             setBalancesLoaded(true)
         })
-    }, [account])
+    }, [tokens, account])
 
     async function onSelect(ev: any) {
         const { value } = ev.target;
@@ -848,17 +847,20 @@ const SpamSelector = (props: any) => {
             defaultSelection = largestIdx
         }
         return defaultSelection
-    }, [props.tokens, balances, balancesLoaded])
+    }, [
+        tokens.outcomes.notSpamToken, tokens.outcomes.spamToken, account, balances, balancesLoaded,
+    ])
+
+    console.log(lastKnownBet)
 
     return (
         <>
             <Select 
                 placeholder="None" 
                 disabled={state.loading} 
-                onChange={onSelect}
-                defaultValue={lastKnownBet}>
+                onChange={onSelect}>
                     {outcomes.map((outcome, idx) => {
-                        return <option key={idx} value={idx}>{outcome}</option>
+                        return <option selected={idx === lastKnownBet} key={idx} value={outcome}>{outcome}</option>
                     })}
             </Select>
 
