@@ -250,28 +250,35 @@ export default function ViewMarket(props: any) {
                 <Column>
                     <PostContent>
                         <Heading as="h3" size="md">
-                            Post title
+                            Post<br/>
                         </Heading>
 
-                        <div>
+                        {/* <Heading as="h4" size="sm">
+                            Title
+                        </Heading> */}
+
+                        <div style={{ marginTop: '1rem' }}>
+                        <Heading as="h4" size="sm">
                         { redditPost && redditPost.title }
+                        </Heading>
                         </div>
 
                         {/* <PostContentPreview>
                             <ReactMarkdown>{redditPost && redditPost.selftext}</ReactMarkdown>
                         </PostContentPreview> */}
 
-                        <Heading as="h3" size="md">
+                        {/* <Heading as="h4" size="sm">
                             Author
-                        </Heading>
-                        <span>@{redditPost && redditPost.author}</span>
-
-                        <Heading as="h3" size="md">
-                            Posted
-                        </Heading>
-                        <Link href={data.spamPredictionMarket.itemUrl} isExternal>
+                        </Heading> */}
+                        <div>@{redditPost && redditPost.author} - <Link href={data.spamPredictionMarket.itemUrl} isExternal>
                             {redditPost && DateTime.fromMillis(redditPost.created * 1000).toRFC2822()} <ExternalLinkIcon mx="2px" />
-                        </Link>
+                        </Link></div>
+
+                        {/* <Heading as="h4" size="sm">
+                            Posted
+                        </Heading> */}
+
+                        
                     </PostContent>
 
                     <MarketOverview>
